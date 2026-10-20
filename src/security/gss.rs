@@ -30,9 +30,11 @@ const GSS_C_DELEG_FLAG: u32 = 0x01;
 const GSS_C_MUTUAL_FLAG: u32 = 0x02;
 
 /// `GSS_C_CONF_FLAG` (0x10) - confidentiality available
+#[cfg(feature = "trace")] // only reported in the context-established trace
 const GSS_C_CONF_FLAG: u32 = 0x10;
 
 /// `GSS_C_INTEG_FLAG` (0x20) - integrity available
+#[cfg(feature = "trace")] // only reported in the context-established trace
 const GSS_C_INTEG_FLAG: u32 = 0x20;
 
 #[cfg(feature = "trace")]

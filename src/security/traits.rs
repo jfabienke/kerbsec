@@ -43,6 +43,7 @@
 use crate::config::{AuthLevel, KerberosConfig};
 use crate::error::Result;
 use crate::security::IovWrap;
+#[cfg(any(test, feature = "mock"))]
 use bytes::Bytes;
 
 /// Trait for GSS-API security context operations
