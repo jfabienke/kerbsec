@@ -839,9 +839,8 @@ mod tests {
     #[test]
     fn test_default_etypes() {
         let etypes = EncryptionType::default_etypes();
-        assert!(!etypes.is_empty());
         // AES-256 should be first (preferred)
-        assert_eq!(etypes[0], EncryptionType::Aes256CtsHmacSha196);
+        assert_eq!(etypes.first(), Some(&EncryptionType::Aes256CtsHmacSha196));
     }
 
     #[cfg(feature = "allow-weak-crypto")]

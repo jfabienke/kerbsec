@@ -107,3 +107,5 @@ significant_drop_tightening = "allow"
 borrow_as_ptr = "allow"
 # Allow unused self in trait implementations
 unused_self = "allow"
+# AP-REQ and AP-REP are protocol names that differ by one letter
+similar_names = "allow"

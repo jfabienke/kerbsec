@@ -172,7 +172,10 @@ mod tests {
             server: Principal::new(
                 NameType::ServiceInstance,
                 "TEST.REALM".to_string(),
-                server_name.split('/').map(|s| s.to_string()).collect(),
+                server_name
+                    .split('/')
+                    .map(std::string::ToString::to_string)
+                    .collect(),
             ),
             key_block: KeyBlock {
                 enctype: 18, // AES256
@@ -185,7 +188,7 @@ mod tests {
                 renew_till: now + 86400,
             },
             is_config: 0,
-            ticket_flags: 0x40a10000,
+            ticket_flags: 0x40a1_0000,
             addresses: Vec::new(),
             ticket: vec![0xde, 0xad, 0xbe, 0xef],
             second_ticket: Vec::new(),
@@ -199,7 +202,7 @@ mod tests {
 
         // Store a credential
         let cred = create_test_credential("host/server.test", false);
-        cache.store_ticket(cred.clone()).unwrap();
+        cache.store_ticket(cred).unwrap();
 
         // Retrieve it
         let retrieved = cache.get_ticket("host/server.test@TEST.REALM").unwrap();
@@ -289,7 +292,7 @@ mod tests {
 
         // Add multiple credentials sequentially
         for i in 0..10 {
-            let cred = create_test_credential(&format!("host/server{}.test", i), false);
+            let cred = create_test_credential(&format!("host/server{i}.test"), false);
             cache.store_ticket(cred).unwrap();
         }
 

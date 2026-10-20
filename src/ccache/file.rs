@@ -274,7 +274,7 @@ impl CredentialCache for FileCache {
         self.path = Some(path.to_path_buf());
 
         // Try to read existing cache
-        if path.exists() && path.metadata().map(|m| m.len() > 0).unwrap_or(false) {
+        if path.exists() && path.metadata().is_ok_and(|m| m.len() > 0) {
             if matches!(self.read_from_file(path), Ok(())) {
             } else {
                 // File exists but couldn't be read - might be corrupted or just created
@@ -292,7 +292,7 @@ impl CredentialCache for FileCache {
         // If we don't have credentials, try to load from file
         if self.credentials.is_empty() {
             if let Some(path) = self.path.clone() {
-                if path.exists() && path.metadata().map(|m| m.len() > 0).unwrap_or(false) {
+                if path.exists() && path.metadata().is_ok_and(|m| m.len() > 0) {
                     // Try to read the file - if it fails, return empty
                     let _ = self.read_from_file(&path);
                 }
@@ -424,7 +424,7 @@ mod tests {
                 renew_till: now + 86400, // 24 hours
             },
             is_config: 0,
-            ticket_flags: 0x40a10000,
+            ticket_flags: 0x40a1_0000,
             addresses: Vec::new(),
             ticket: vec![0xde, 0xad, 0xbe, 0xef], // Dummy ticket
             second_ticket: Vec::new(),
@@ -470,8 +470,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let cache_path = dir.path().join("atomic.cache");
 
-        let mut config = CacheConfig::default();
-        config.atomic_writes = true;
+        let config = CacheConfig {
+            atomic_writes: true,
+            ..Default::default()
+        };
 
         let mut cache = FileCache::new(config);
         cache.open(&cache_path).unwrap();

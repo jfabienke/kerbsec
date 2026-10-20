@@ -22,16 +22,13 @@ mod dns_tests {
             ("HOST.LOCAL", "host.local"),
         ];
 
-        for (input, expected) in tests {
+        for (input, _expected) in tests {
             // This will fail without actual DNS, but tests the lowercasing
-            match canonicalize_fqdn(input, Duration::from_secs(1)).await {
-                Ok(result) => {
-                    // If it resolves, must be lowercase
-                    assert_eq!(result.to_lowercase(), result);
-                }
-                Err(_) => {
-                    // Expected without DNS server
-                }
+            if let Ok(result) = canonicalize_fqdn(input, Duration::from_secs(1)).await {
+                // If it resolves, must be lowercase
+                assert_eq!(result.to_lowercase(), result);
+            } else {
+                // Expected without DNS server
             }
         }
     }
@@ -52,19 +49,16 @@ mod dns_tests {
         let tests = vec!["example.com.", "server.example.com.", "host.local."];
 
         for input in tests {
-            match canonicalize_fqdn(input, Duration::from_secs(1)).await {
-                Ok(result) => {
-                    assert!(!result.ends_with('.'));
-                }
-                Err(_) => {
-                    // Expected without DNS
-                }
+            if let Ok(result) = canonicalize_fqdn(input, Duration::from_secs(1)).await {
+                assert!(!result.ends_with('.'));
+            } else {
+                // Expected without DNS
             }
         }
     }
 
     #[tokio::test]
-    #[ignore] // Requires real DNS server
+    #[ignore = "Requires real DNS server"]
     async fn test_canonicalize_cname_chain() {
         // Test CNAME chasing (requires configured DNS)
         // www.google.com typically has CNAMEs

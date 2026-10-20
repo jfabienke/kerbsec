@@ -15,9 +15,9 @@ mod tests {
         let trailer = vec![0x05, 0x06, 0x07, 0x08];
 
         let iov = IovWrap {
-            header: header.clone().into(),
+            header: header.into(),
             payload: payload.into(),
-            trailer: trailer.clone().into(),
+            trailer: trailer.into(),
             conf: true,
         };
 
@@ -135,12 +135,12 @@ mod tests {
     #[test]
     fn test_dce_three_leg_sequence() {
         // Leg 1: AP-REQ in bind
-        let ap_req = vec![0x60, 0x82]; // ASN.1 application tag
-        assert!(!ap_req.is_empty());
+        let ap_req = [0x60, 0x82]; // ASN.1 application tag
+        assert_eq!(ap_req[0] & 0xE0, 0x60); // Application class
 
         // Leg 2: AP-REP in bind_ack
-        let ap_rep = vec![0x6f, 0x82]; // ASN.1 application tag
-        assert!(!ap_rep.is_empty());
+        let ap_rep = [0x6f, 0x82]; // ASN.1 application tag
+        assert_eq!(ap_rep[0] & 0xE0, 0x60); // Application class
 
         // Leg 3: Final token in alter_context (may be empty)
         let third_leg: Vec<u8> = vec![];

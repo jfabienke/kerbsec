@@ -344,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires running KCM daemon
+    #[ignore = "Requires running KCM daemon"]
     fn test_kcm_connect() {
         let config = CacheConfig::default();
         let cache = KcmCache::new(config);
@@ -352,7 +352,7 @@ mod tests {
         // This will fail unless KCM daemon is running
         match cache.connect() {
             Ok(_) => println!("Successfully connected to KCM daemon"),
-            Err(e) => println!("Expected error (no daemon): {}", e),
+            Err(e) => println!("Expected error (no daemon): {e}"),
         }
     }
 }

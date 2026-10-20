@@ -446,7 +446,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore] // Requires Linux kernel with keyring support
+    #[ignore = "Requires Linux kernel with keyring support"]
     fn test_keyring_basic() {
         let config = CacheConfig::default();
         let mut cache = KeyringCache::new(config);
@@ -456,10 +456,7 @@ mod tests {
 
         // This might fail on non-Linux or without proper permissions
         if result.is_err() {
-            println!(
-                "Expected error (not on Linux or no keyring support): {:?}",
-                result
-            );
+            println!("Expected error (not on Linux or no keyring support): {result:?}");
             return;
         }
 

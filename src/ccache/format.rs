@@ -592,7 +592,7 @@ mod tests {
         let key_data = vec![0x42u8; 32]; // Dummy key
         let key_block = KeyBlock {
             enctype: EncType::Aes256CtsHmacSha1_96 as u16,
-            key_data: key_data.clone(),
+            key_data,
         };
 
         // Manually drop and check zeroization
@@ -604,10 +604,10 @@ mod tests {
     #[test]
     fn test_times_serialization() {
         let times = Times {
-            auth_time: 1234567890,
-            start_time: 1234567891,
-            end_time: 1234567892,
-            renew_till: 1234567893,
+            auth_time: 1_234_567_890,
+            start_time: 1_234_567_891,
+            end_time: 1_234_567_892,
+            renew_till: 1_234_567_893,
         };
 
         let mut buf = Vec::new();

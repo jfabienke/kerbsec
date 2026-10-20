@@ -46,6 +46,7 @@ fn get_test_config() -> Option<TestConfig> {
 
 struct TestConfig {
     realm: String,
+    #[allow(dead_code)]
     user: String,
     #[allow(dead_code)]
     password: String,
@@ -242,7 +243,7 @@ mod mock_tests {
 
         // Generate token
         let token = ctx.initial_token().expect("Should generate token");
-        assert!(!token.is_empty());
+        assert_ne!(token.len(), 0);
 
         // Accept response
         let third_leg = ctx

@@ -191,8 +191,7 @@ mod tests {
     #[test]
     fn test_channel_bindings_creation() {
         let binding_data = vec![0x01, 0x02, 0x03, 0x04];
-        let bindings =
-            ChannelBindings::new_tls(ChannelBindingType::TlsExporter, binding_data.clone());
+        let bindings = ChannelBindings::new_tls(ChannelBindingType::TlsExporter, binding_data);
 
         assert_eq!(bindings.binding_type, Some(ChannelBindingType::TlsExporter));
         assert!(bindings.application_data.is_some());

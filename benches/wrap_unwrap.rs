@@ -2,9 +2,14 @@
 //!
 //! Run with: cargo bench
 
+// criterion_group! generates an undocumented `pub fn`.
+#![allow(missing_docs)]
+
 use bytes::Bytes;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use fabi_kerbsec::{AuthLevel, IovWrap};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 /// Benchmark data sizes
 const SMALL_PAYLOAD: usize = 256; // Small RPC call
@@ -18,7 +23,7 @@ struct MockGssContext {
 }
 
 impl MockGssContext {
-    fn new(auth_level: AuthLevel) -> Self {
+    const fn new(auth_level: AuthLevel) -> Self {
         Self {
             auth_level,
             seq_num: 0,
@@ -50,8 +55,6 @@ impl MockGssContext {
         }
 
         // Add MIC
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
         data.hash(&mut hasher);
         header.hash(&mut hasher);
@@ -101,7 +104,7 @@ fn benchmark_wrap_integrity(c: &mut Criterion) {
         let data = vec![0x42u8; *size];
         group.throughput(Throughput::Bytes(*size as u64));
 
-        group.bench_function(format!("{}_bytes", size), |b| {
+        group.bench_function(format!("{size}_bytes"), |b| {
             let mut ctx = MockGssContext::new(AuthLevel::Integrity);
             b.iter(|| {
                 let wrapped = ctx.wrap_iov(black_box(&data));
@@ -120,7 +123,7 @@ fn benchmark_wrap_privacy(c: &mut Criterion) {
         let data = vec![0x42u8; *size];
         group.throughput(Throughput::Bytes(*size as u64));
 
-        group.bench_function(format!("{}_bytes", size), |b| {
+        group.bench_function(format!("{size}_bytes"), |b| {
             let mut ctx = MockGssContext::new(AuthLevel::Privacy);
             b.iter(|| {
                 let wrapped = ctx.wrap_iov(black_box(&data));
@@ -141,11 +144,8 @@ fn benchmark_unwrap_integrity(c: &mut Criterion) {
         let wrapped = ctx.wrap_iov(&data);
         group.throughput(Throughput::Bytes(*size as u64));
 
-        group.bench_function(format!("{}_bytes", size), |b| {
-            b.iter(|| {
-                let result = ctx.unwrap_iov(black_box(&wrapped), black_box(&data));
-                black_box(result);
-            });
+        group.bench_function(format!("{size}_bytes"), |b| {
+            b.iter(|| ctx.unwrap_iov(black_box(&wrapped), black_box(&data)));
         });
     }
 
@@ -161,11 +161,8 @@ fn benchmark_unwrap_privacy(c: &mut Criterion) {
         let wrapped = ctx.wrap_iov(&data);
         group.throughput(Throughput::Bytes(*size as u64));
 
-        group.bench_function(format!("{}_bytes", size), |b| {
-            b.iter(|| {
-                let result = ctx.unwrap_iov(black_box(&wrapped), black_box(&data));
-                black_box(result);
-            });
+        group.bench_function(format!("{size}_bytes"), |b| {
+            b.iter(|| ctx.unwrap_iov(black_box(&wrapped), black_box(&data)));
         });
     }
 
@@ -179,7 +176,7 @@ fn benchmark_iov_overhead(c: &mut Criterion) {
     for size in &[256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536] {
         let data = vec![0x42u8; *size];
 
-        group.bench_function(format!("integrity_{}", size), |b| {
+        group.bench_function(format!("integrity_{size}"), |b| {
             b.iter(|| {
                 let mut ctx = MockGssContext::new(AuthLevel::Integrity);
                 let wrapped = ctx.wrap_iov(black_box(&data));
@@ -188,7 +185,7 @@ fn benchmark_iov_overhead(c: &mut Criterion) {
             });
         });
 
-        group.bench_function(format!("privacy_{}", size), |b| {
+        group.bench_function(format!("privacy_{size}"), |b| {
             b.iter(|| {
                 let mut ctx = MockGssContext::new(AuthLevel::Privacy);
                 let wrapped = ctx.wrap_iov(black_box(&data));

@@ -62,8 +62,7 @@ mod tests {
             // SPN validation should reject invalid formats early
             assert!(
                 config.is_err(),
-                "Expected error for invalid SPN '{}', but got Ok",
-                invalid_spn
+                "Expected error for invalid SPN '{invalid_spn}', but got Ok"
             );
         }
 
@@ -99,15 +98,15 @@ mod tests {
         struct AuthToken {
             sequence_num: u32,
             timestamp: u64,
-            data: Vec<u8>,
+            _data: Vec<u8>,
         }
 
         impl AuthToken {
             fn new(seq: u32) -> Self {
                 Self {
                     sequence_num: seq,
-                    timestamp: 1234567890,
-                    data: vec![0x60, 0x82], // Mock GSS token
+                    timestamp: 1_234_567_890,
+                    _data: vec![0x60, 0x82], // Mock GSS token
                 }
             }
 
@@ -116,11 +115,7 @@ mod tests {
             }
 
             fn verify_freshness(&self, current_time: u64, max_skew: u64) -> bool {
-                let diff = if current_time > self.timestamp {
-                    current_time - self.timestamp
-                } else {
-                    self.timestamp - current_time
-                };
+                let diff = current_time.abs_diff(self.timestamp);
                 diff <= max_skew
             }
         }
@@ -140,7 +135,7 @@ mod tests {
         assert!(!replayed.verify_sequence(4)); // Should expect 4, not 1
 
         // Time-based replay detection (5 minute window)
-        let current_time = 1234567890 + 400; // 400 seconds later
+        let current_time = 1_234_567_890 + 400; // 400 seconds later
         assert!(!token1.verify_freshness(current_time, 300)); // 5 min = 300 sec
     }
 
@@ -248,6 +243,13 @@ mod tests {
     /// Test auth level negotiation
     #[test]
     fn test_auth_level_downgrade_prevention() {
+        // Level the server offers back
+        #[derive(Debug)]
+        enum NegotiatedLevel {
+            Integrity = 5,
+            Privacy = 6,
+        }
+
         // Client requests Privacy (level 6)
         let client_config = KerberosConfig::builder()
             .realm("SECURE.CORP")
@@ -258,24 +260,17 @@ mod tests {
 
         assert_eq!(client_config.default_auth, AuthLevel::Privacy);
 
-        // Simulate server response trying to downgrade
-        #[derive(Debug)]
-        enum NegotiatedLevel {
-            Integrity = 5,
-            Privacy = 6,
-        }
-
-        let server_offered = NegotiatedLevel::Integrity;
-
-        // Client should reject downgrade from Privacy to Integrity
-        let acceptable = match (&client_config.default_auth, &server_offered) {
+        let acceptable = |offered: &NegotiatedLevel| match (&client_config.default_auth, offered) {
             (AuthLevel::Privacy, NegotiatedLevel::Integrity) => false, // Reject downgrade
-            (AuthLevel::Privacy, NegotiatedLevel::Privacy) => true,
-            (AuthLevel::Integrity, _) => true, // Accept same or upgrade
-            _ => false,
+            (AuthLevel::Privacy, NegotiatedLevel::Privacy) | (AuthLevel::Integrity, _) => true, // Accept same or upgrade
         };
 
-        assert!(!acceptable, "Should reject auth level downgrade");
+        // Client should reject downgrade from Privacy to Integrity
+        assert!(
+            !acceptable(&NegotiatedLevel::Integrity),
+            "Should reject auth level downgrade"
+        );
+        assert!(acceptable(&NegotiatedLevel::Privacy));
     }
 
     /// Test RC4 cipher suite disabled by default
@@ -292,8 +287,8 @@ mod tests {
 
         fn is_cipher_allowed(cipher: &CipherSuite, allow_weak: bool) -> bool {
             match cipher {
-                CipherSuite::AES256 | CipherSuite::AES128 => true,
-                CipherSuite::DES3 => true, // Still allowed for compatibility
+                // DES3 is still allowed for compatibility
+                CipherSuite::AES256 | CipherSuite::AES128 | CipherSuite::DES3 => true,
                 CipherSuite::RC4 => allow_weak, // Only if explicitly enabled
             }
         }
@@ -302,6 +297,7 @@ mod tests {
         assert!(!is_cipher_allowed(&CipherSuite::RC4, false));
         assert!(is_cipher_allowed(&CipherSuite::AES256, false));
         assert!(is_cipher_allowed(&CipherSuite::AES128, false));
+        assert!(is_cipher_allowed(&CipherSuite::DES3, false));
 
         // With weak ciphers enabled (NOT RECOMMENDED)
         assert!(is_cipher_allowed(&CipherSuite::RC4, true));

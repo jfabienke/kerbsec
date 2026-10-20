@@ -590,7 +590,7 @@ mod tests {
 
         // Generate initial token
         let token = ctx.initial_token().unwrap();
-        assert!(!token.is_empty());
+        assert_ne!(token.len(), 0);
         assert!(!ctx.is_established());
 
         // Accept response

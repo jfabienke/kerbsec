@@ -5,7 +5,7 @@ mod iov_tests {
     use fabi_kerbsec::{AuthLevel, Context, KerberosConfig};
 
     #[test]
-    #[ignore] // Requires Kerberos environment
+    #[ignore = "Requires Kerberos environment"]
     fn test_iov_wrap_unwrap() {
         // Create context
         let config = KerberosConfig::builder()
@@ -22,28 +22,22 @@ mod iov_tests {
         let pdu = b"test PDU data";
 
         // Test integrity protection
-        match ctx.wrap_iov_with(pdu, AuthLevel::Integrity) {
-            Ok(wrapped) => {
-                // Should return full token as header (until real IOV)
-                assert!(!wrapped.header.is_empty());
-                assert!(wrapped.trailer.is_empty()); // No trailer until real IOV
-                assert!(!wrapped.conf); // Not confidential
-            }
-            Err(_) => {
-                // Expected without established context
-            }
+        if let Ok(wrapped) = ctx.wrap_iov_with(pdu, AuthLevel::Integrity) {
+            // Should return full token as header (until real IOV)
+            assert!(!wrapped.header.is_empty());
+            assert!(wrapped.trailer.is_empty()); // No trailer until real IOV
+            assert!(!wrapped.conf); // Not confidential
+        } else {
+            // Expected without established context
         }
 
         // Test privacy protection
-        match ctx.wrap_iov_with(pdu, AuthLevel::Privacy) {
-            Ok(wrapped) => {
-                assert!(!wrapped.header.is_empty());
-                assert!(wrapped.trailer.is_empty()); // No trailer until real IOV
-                assert!(wrapped.conf); // Confidential
-            }
-            Err(_) => {
-                // Expected without established context
-            }
+        if let Ok(wrapped) = ctx.wrap_iov_with(pdu, AuthLevel::Privacy) {
+            assert!(!wrapped.header.is_empty());
+            assert!(wrapped.trailer.is_empty()); // No trailer until real IOV
+            assert!(wrapped.conf); // Confidential
+        } else {
+            // Expected without established context
         }
     }
 
@@ -75,10 +69,10 @@ mod iov_tests {
 
 #[cfg(test)]
 mod dce_handshake_tests {
-    use fabi_kerbsec::{Context, Error, KerberosConfig};
+    use fabi_kerbsec::{Context, KerberosConfig};
 
     #[test]
-    #[ignore] // Requires Kerberos environment
+    #[ignore = "Requires Kerberos environment"]
     fn test_dce_three_leg_handshake() {
         // Simulates DCE/RPC 3-leg authentication handshake
 
@@ -94,12 +88,9 @@ mod dce_handshake_tests {
         let ap_req = ctx.initial_token();
         match ap_req {
             Ok(token) => {
-                assert!(!token.is_empty());
                 // AP-REQ should start with proper ASN.1 tag
                 // 0x6E = [APPLICATION 14] for AP-REQ
-                if token.len() > 0 {
-                    assert_eq!(token[0] & 0xE0, 0x60); // Application class
-                }
+                assert_eq!(token.first().map(|b| b & 0xE0), Some(0x60)); // Application class
             }
             Err(_) => {
                 // Expected without Kerberos credentials
@@ -111,18 +102,10 @@ mod dce_handshake_tests {
         // In real scenario, this comes from server
         let mock_ap_rep = vec![0x6F, 0x00]; // [APPLICATION 15] for AP-REP
 
-        let third_leg = ctx.accept_ap_rep(&mock_ap_rep);
-        match third_leg {
-            Ok(Some(token)) => {
-                // DCE-style third leg is optional
-                assert!(!token.is_empty());
-            }
-            Ok(None) => {
-                // No third leg needed - context established
-            }
-            Err(_) => {
-                // Expected with mock AP-REP
-            }
+        // DCE-style third leg is optional. No token means the context is
+        // established; an error is expected with a mock AP-REP.
+        if let Ok(Some(token)) = ctx.accept_ap_rep(&mock_ap_rep) {
+            assert_ne!(token.len(), 0);
         }
 
         // Step 3: Check if established
@@ -138,6 +121,8 @@ mod dce_handshake_tests {
     #[test]
     fn test_context_thread_safety() {
         // Context should be Send but NOT Sync
+        fn assert_send<T: Send>(_: &T) {}
+
         let config = KerberosConfig::builder()
             .realm("EXAMPLE.COM")
             .target_host("server.example.com")
@@ -147,33 +132,11 @@ mod dce_handshake_tests {
         let ctx = Context::new(config).unwrap();
 
         // This should compile - Context is Send
-        fn assert_send<T: Send>(_: &T) {}
         assert_send(&ctx);
 
         // This should NOT compile if uncommented - Context is not Sync
         // fn assert_sync<T: Sync>(_: &T) {}
         // assert_sync(&ctx); // Compile error: Context is not Sync
-    }
-
-    #[test]
-    fn test_no_gss_c_dce_style_documented() {
-        // This test documents that GSS_C_DCE_STYLE is not available
-        // When it becomes available, update to use flag value 0x1000
-
-        // Currently we can't set DCE_STYLE flag
-        // This may cause issues with:
-        // - Out-of-order RPC responses
-        // - Concurrent RPC calls
-        // - RPC fragmentation with interleaved fragments
-
-        // TODO: When libgssapi exposes DCE_STYLE:
-        // const GSS_C_DCE_STYLE: u32 = 0x1000;
-        // flags |= CtxFlags::GSS_C_DCE_STYLE;
-
-        assert!(
-            true,
-            "GSS_C_DCE_STYLE not available - documented limitation"
-        );
     }
 }
 
@@ -187,14 +150,14 @@ mod error_mapping_tests {
 
         // Example error with specific codes
         let err = Error::Gss {
-            major: 0x80000000, // GSS_S_FAILURE
+            major: 0x8000_0000, // GSS_S_FAILURE
             minor: 12345,
             text: "Test error".to_string(),
         };
 
         match err {
             Error::Gss { major, minor, text } => {
-                assert_eq!(major, 0x80000000);
+                assert_eq!(major, 0x8000_0000);
                 assert_eq!(minor, 12345);
                 assert_eq!(text, "Test error");
             }
@@ -205,12 +168,12 @@ mod error_mapping_tests {
     #[test]
     fn test_error_display() {
         let err = Error::Gss {
-            major: 0x80000000,
+            major: 0x8000_0000,
             minor: 12345,
             text: "Authentication failed".to_string(),
         };
 
-        let display = format!("{}", err);
+        let display = format!("{err}");
         assert!(display.contains("Authentication failed"));
     }
 }

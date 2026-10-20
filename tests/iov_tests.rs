@@ -6,16 +6,7 @@ mod iov_tests {
     use kerbsec::{AuthLevel, Context, KerberosConfig};
 
     #[test]
-    fn test_iov_feature_detection() {
-        // Verify that IOV feature is compiled in
-        #[cfg(feature = "iov")]
-        {
-            assert!(true, "IOV feature is enabled");
-        }
-    }
-
-    #[test]
-    #[ignore] // Requires Kerberos environment
+    #[ignore = "Requires Kerberos environment"]
     fn test_wrap_unwrap_with_iov() {
         let config = KerberosConfig::builder()
             .realm("EXAMPLE.COM")
@@ -30,28 +21,22 @@ mod iov_tests {
         let pdu = b"test PDU data for IOV";
 
         // Test with Integrity protection
-        match ctx.wrap_iov_with(pdu, AuthLevel::Integrity) {
-            Ok(wrapped) => {
-                // With real IOV, header and trailer should be separate
-                assert!(!wrapped.header.is_empty());
-                // Trailer might be empty for integrity-only
-                assert!(!wrapped.conf); // Not confidential
-            }
-            Err(_) => {
-                // Expected without established context
-            }
+        if let Ok(wrapped) = ctx.wrap_iov_with(pdu, AuthLevel::Integrity) {
+            // With real IOV, header and trailer should be separate
+            assert!(!wrapped.header.is_empty());
+            // Trailer might be empty for integrity-only
+            assert!(!wrapped.conf); // Not confidential
+        } else {
+            // Expected without established context
         }
 
         // Test with Privacy protection
-        match ctx.wrap_iov_with(pdu, AuthLevel::Privacy) {
-            Ok(wrapped) => {
-                assert!(!wrapped.header.is_empty());
-                // With real IOV, trailer should be populated for privacy
-                assert!(wrapped.conf); // Confidential
-            }
-            Err(_) => {
-                // Expected without established context
-            }
+        if let Ok(wrapped) = ctx.wrap_iov_with(pdu, AuthLevel::Privacy) {
+            assert!(!wrapped.header.is_empty());
+            // With real IOV, trailer should be populated for privacy
+            assert!(wrapped.conf); // Confidential
+        } else {
+            // Expected without established context
         }
     }
 
