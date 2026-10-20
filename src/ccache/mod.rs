@@ -114,7 +114,7 @@ pub fn create_cache(config: CacheConfig) -> Result<Box<dyn CredentialCache>> {
         #[cfg(all(target_os = "linux", feature = "ccache-keyring"))]
         CacheBackend::Keyring => Ok(Box::new(keyring::KeyringCache::new(config))),
         #[cfg(all(target_os = "linux", not(feature = "ccache-keyring")))]
-        CacheBackend::Keyring => Err(Error::Ccache {
+        CacheBackend::Keyring => Err(crate::error::Error::Ccache {
             text: "Keyring backend not compiled in (enable ccache-keyring feature)".to_string(),
         }),
         #[cfg(feature = "ccache-kcm")]
