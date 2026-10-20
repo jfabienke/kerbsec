@@ -172,10 +172,10 @@ Security vulnerabilities should be reported via:
 ## Links
 
 - [Documentation](https://internal.docs/kerbsec)
-- [Issue Tracker](https://github.com/internal/kerbsec/issues)
+- [Issue Tracker](https://github.com/jfabienke/kerbsec/issues)
 - [Security Policy](docs/SECURITY.md)
 
-[Unreleased]: https://github.com/internal/kerbsec/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/internal/kerbsec/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/internal/kerbsec/compare/v0.0.1...v0.1.0
-[0.0.1]: https://github.com/internal/kerbsec/releases/tag/v0.0.1
+[Unreleased]: https://github.com/jfabienke/kerbsec/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jfabienke/kerbsec/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/jfabienke/kerbsec/compare/v0.0.1...v0.1.0
+[0.0.1]: https://github.com/jfabienke/kerbsec/releases/tag/v0.0.1

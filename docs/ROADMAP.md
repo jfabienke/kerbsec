@@ -173,7 +173,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## Contact
 
-- Issues: [GitHub Issues](https://github.com/yourusername/kerbsec/issues)
+- Issues: [GitHub Issues](https://github.com/jfabienke/kerbsec/issues)
 - Security: security@example.com
 - Discord: [Join our server](https://discord.gg/example)
 
