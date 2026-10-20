@@ -8,6 +8,7 @@
 
 #[cfg(test)]
 mod tests {
+    use fabi_kerbsec as kerbsec;
     use kerbsec::{AuthLevel, KerberosConfig};
 
     /// Test that IP address targets without SPN override fail appropriately

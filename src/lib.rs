@@ -50,7 +50,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use kerbsec::{Context, KerberosConfig, AuthLevel, ServiceClass};
+//! use fabi_kerbsec::{Context, KerberosConfig, AuthLevel, ServiceClass};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Build SPN using helper

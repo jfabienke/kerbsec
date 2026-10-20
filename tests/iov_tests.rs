@@ -2,6 +2,7 @@
 
 #[cfg(all(test, feature = "iov"))]
 mod iov_tests {
+    use fabi_kerbsec as kerbsec;
     use kerbsec::{AuthLevel, Context, KerberosConfig};
 
     #[test]

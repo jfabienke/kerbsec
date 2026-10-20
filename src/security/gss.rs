@@ -426,6 +426,85 @@ impl GssContext {
         }
     }
 
+    /// Query the DCE/RPC `auth_value` length for a padded stub of `padded_stub_len` bytes.
+    pub fn dce_auth_value_len(&self, conf_req: bool, padded_stub_len: usize) -> Result<usize> {
+        #[cfg(feature = "iov")]
+        {
+            let ctx = if self.established {
+                self.inner.as_ref()
+            } else {
+                None
+            };
+            super::gss_iov::dce_auth_value_len_real(ctx, conf_req, padded_stub_len)
+        }
+
+        #[cfg(not(feature = "iov"))]
+        {
+            let _ = (conf_req, padded_stub_len);
+            Err(Error::Iov("DCE/RPC IOV requires the `iov` feature".into()))
+        }
+    }
+
+    /// Protect a DCE/RPC PDU using the 4-buffer `GSS_C_DCE_STYLE` IOV layout
+    /// (`SIGN_ONLY` header, `DATA` stub, `SIGN_ONLY` `sec_trailer`, `HEADER` `auth_value`).
+    pub fn wrap_dce_iov(
+        &mut self,
+        header: &[u8],
+        stub: &mut [u8],
+        sec_trailer: &[u8],
+        conf_req: bool,
+    ) -> Result<Vec<u8>> {
+        let ctx = self.inner.as_mut().ok_or(Error::NotEstablished)?;
+        if !self.established {
+            return Err(Error::NotEstablished);
+        }
+
+        #[cfg(feature = "iov")]
+        {
+            super::gss_iov::wrap_dce_iov_real(ctx, header, stub, sec_trailer, conf_req)
+        }
+
+        #[cfg(not(feature = "iov"))]
+        {
+            let _ = (ctx, header, stub, sec_trailer, conf_req);
+            Err(Error::Iov("DCE/RPC IOV requires the `iov` feature".into()))
+        }
+    }
+
+    /// Verify and (when `expect_conf = true`) decrypt in-place a DCE/RPC PDU
+    /// using the 4-buffer `GSS_C_DCE_STYLE` IOV layout.
+    pub fn unwrap_dce_iov(
+        &mut self,
+        header: &[u8],
+        stub: &mut [u8],
+        sec_trailer: &[u8],
+        auth_value: &[u8],
+        expect_conf: bool,
+    ) -> Result<()> {
+        let ctx = self.inner.as_mut().ok_or(Error::NotEstablished)?;
+        if !self.established {
+            return Err(Error::NotEstablished);
+        }
+
+        #[cfg(feature = "iov")]
+        {
+            super::gss_iov::unwrap_dce_iov_real(
+                ctx,
+                header,
+                stub,
+                sec_trailer,
+                auth_value,
+                expect_conf,
+            )
+        }
+
+        #[cfg(not(feature = "iov"))]
+        {
+            let _ = (ctx, header, stub, sec_trailer, auth_value, expect_conf);
+            Err(Error::Iov("DCE/RPC IOV requires the `iov` feature".into()))
+        }
+    }
+
     /// Check if delegated credentials are available
     ///
     /// Returns true if delegation was both requested AND successfully

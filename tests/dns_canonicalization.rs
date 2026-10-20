@@ -2,7 +2,7 @@
 
 #[cfg(all(test, feature = "dns"))]
 mod dns_tests {
-    use kerbsec::dns::resolver::canonicalize_fqdn;
+    use fabi_kerbsec::dns::resolver::canonicalize_fqdn;
     use std::time::Duration;
 
     #[tokio::test]
@@ -83,7 +83,7 @@ mod dns_tests {
 
 #[cfg(test)]
 mod config_tests {
-    use kerbsec::{Error, KerberosConfig};
+    use fabi_kerbsec::{Error, KerberosConfig};
 
     #[test]
     fn test_ip_requires_spn_override() {

@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 mod tests {
-    use kerbsec::IovWrap;
+    use fabi_kerbsec::IovWrap;
 
     /// Test IOV structure creation
     #[test]

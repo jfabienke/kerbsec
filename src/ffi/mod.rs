@@ -186,6 +186,20 @@ extern "C" {
         iov_count: c_int,
     ) -> OM_uint32;
 
+    /// Query output buffer lengths for `gss_wrap_iov`
+    ///
+    /// Populates the `length` fields of `HEADER`, `PADDING`, and `TRAILER`
+    /// descriptors in `iov` for the given `DATA` and `SIGN_ONLY` buffers.
+    pub fn gss_wrap_iov_length(
+        minor_status: *mut OM_uint32,
+        context_handle: gss_ctx_id_t,
+        conf_req_flag: c_int,
+        qop_req: gss_qop_t,
+        conf_state: *mut c_int,
+        iov: gss_iov_buffer_t,
+        iov_count: c_int,
+    ) -> OM_uint32;
+
     /// Query the maximum message size for wrapped output
     ///
     /// Returns the maximum input message size that will fit in the requested

@@ -24,6 +24,7 @@
 
 #![cfg(feature = "integration-tests")]
 
+use fabi_kerbsec as kerbsec;
 use kerbsec::{AuthLevel, KerberosConfig};
 use std::env;
 
@@ -335,7 +336,7 @@ mod error_tests {
     #[test]
     fn test_error_types_exist() {
         // Verify Windows AD specific error types are available
-        use kerbsec::Error;
+        use fabi_kerbsec::Error;
 
         // These should compile - verifying the error variants exist
         let _clock_skew = Error::ClockSkew { max_skew_secs: 300 };

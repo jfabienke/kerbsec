@@ -1,6 +1,6 @@
 //! Tests for DCE-style and delegation configuration flags
 
-use kerbsec::{AuthLevel, KerberosConfig};
+use fabi_kerbsec::{AuthLevel, KerberosConfig};
 
 #[test]
 fn test_dce_style_default_enabled() {

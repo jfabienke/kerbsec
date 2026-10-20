@@ -12,7 +12,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use kerbsec::{Context, KerberosConfig};
+//! use fabi_kerbsec::{Context, KerberosConfig};
 //!
 //! # fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let config = KerberosConfig::builder()
@@ -321,6 +321,70 @@ impl Context {
 
         #[cfg(not(unix))]
         {
+            Err(crate::error::Error::Config(
+                "kerbsec only supports Unix platforms".into(),
+            ))
+        }
+    }
+
+    /// Query the DCE/RPC `auth_value` length for a padded stub of `padded_stub_len` bytes.
+    pub fn dce_auth_value_len(&self, conf_req: bool, padded_stub_len: usize) -> Result<usize> {
+        #[cfg(unix)]
+        {
+            self.inner.dce_auth_value_len(conf_req, padded_stub_len)
+        }
+
+        #[cfg(not(unix))]
+        {
+            let _ = (conf_req, padded_stub_len);
+            Err(crate::error::Error::Config(
+                "kerbsec only supports Unix platforms".into(),
+            ))
+        }
+    }
+
+    /// Protect a DCE/RPC PDU using the 4-buffer `GSS_C_DCE_STYLE` IOV layout
+    /// (`SIGN_ONLY` header, `DATA` stub, `SIGN_ONLY` `sec_trailer`, `HEADER` `auth_value`).
+    pub fn wrap_dce_iov(
+        &mut self,
+        header: &[u8],
+        stub: &mut [u8],
+        sec_trailer: &[u8],
+        conf_req: bool,
+    ) -> Result<Vec<u8>> {
+        #[cfg(unix)]
+        {
+            self.inner.wrap_dce_iov(header, stub, sec_trailer, conf_req)
+        }
+
+        #[cfg(not(unix))]
+        {
+            let _ = (header, stub, sec_trailer, conf_req);
+            Err(crate::error::Error::Config(
+                "kerbsec only supports Unix platforms".into(),
+            ))
+        }
+    }
+
+    /// Verify and (when `expect_conf = true`) decrypt in-place a DCE/RPC PDU
+    /// using the 4-buffer `GSS_C_DCE_STYLE` IOV layout.
+    pub fn unwrap_dce_iov(
+        &mut self,
+        header: &[u8],
+        stub: &mut [u8],
+        sec_trailer: &[u8],
+        auth_value: &[u8],
+        expect_conf: bool,
+    ) -> Result<()> {
+        #[cfg(unix)]
+        {
+            self.inner
+                .unwrap_dce_iov(header, stub, sec_trailer, auth_value, expect_conf)
+        }
+
+        #[cfg(not(unix))]
+        {
+            let _ = (header, stub, sec_trailer, auth_value, expect_conf);
             Err(crate::error::Error::Config(
                 "kerbsec only supports Unix platforms".into(),
             ))

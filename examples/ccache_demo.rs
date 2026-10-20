@@ -5,7 +5,7 @@
 //!
 //! Run with: cargo run --example ccache_demo --features ccache
 
-use kerbsec::ccache::{
+use fabi_kerbsec::ccache::{
     create_cache, CacheBackend, CacheConfig, Credential, CredentialCache, EncType, KeyBlock,
     NameType, Principal, Times,
 };

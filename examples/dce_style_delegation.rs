@@ -10,7 +10,7 @@
 //! cargo run --example dce_style_delegation --features dns,runtime
 //! ```
 
-use kerbsec::{AuthLevel, KerberosConfig};
+use fabi_kerbsec::{AuthLevel, KerberosConfig};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing if available

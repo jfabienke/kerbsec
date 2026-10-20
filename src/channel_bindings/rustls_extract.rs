@@ -25,8 +25,8 @@ use crate::error::Result;
 ///
 /// ```ignore
 /// use rustls::ClientConnection;
-/// use kerbsec::channel_bindings::rustls_extract::extract_rustls_bindings;
-/// use kerbsec::channel_bindings::ChannelBindingType;
+/// use fabi_kerbsec::channel_bindings::rustls_extract::extract_rustls_bindings;
+/// use fabi_kerbsec::channel_bindings::ChannelBindingType;
 ///
 /// # fn example(conn: &ClientConnection) -> Result<(), Box<dyn std::error::Error>> {
 /// let bindings = extract_rustls_bindings(conn, ChannelBindingType::TlsExporter)?;

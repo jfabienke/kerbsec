@@ -4,7 +4,7 @@
 
 use bytes::Bytes;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use kerbsec::{AuthLevel, IovWrap};
+use fabi_kerbsec::{AuthLevel, IovWrap};
 
 /// Benchmark data sizes
 const SMALL_PAYLOAD: usize = 256; // Small RPC call

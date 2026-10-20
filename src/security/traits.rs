@@ -356,6 +356,97 @@ impl SecurityContext for MockSecurityContext {
     }
 }
 
+#[cfg(any(test, feature = "mock"))]
+impl MockSecurityContext {
+    fn compute_dce_auth_token(
+        header: &[u8],
+        plaintext_stub: &[u8],
+        sec_trailer: &[u8],
+        sealed: bool,
+    ) -> Vec<u8> {
+        let len = if sealed { 60 } else { 28 };
+        let mut token = vec![0u8; len];
+        // RFC 4121 wrap token ID (0x0504)
+        token[0] = 0x05;
+        token[1] = 0x04;
+        token[2] = u8::from(sealed) << 1;
+        token[3] = 0xFF;
+        // Fold header (SIGN_ONLY), plaintext_stub (DATA), and sec_trailer (SIGN_ONLY)
+        // into the 12-byte rotated HMAC region (token[16..28]) so any tampering with
+        // header, stub, or sec_trailer is detected.
+        let mut acc = [0xA5u8; 12];
+        for (i, &b) in header
+            .iter()
+            .chain(plaintext_stub.iter())
+            .chain(sec_trailer.iter())
+            .enumerate()
+        {
+            let idx = i % acc.len();
+            acc[idx] = acc[idx].wrapping_mul(31).wrapping_add(b) ^ (i as u8);
+        }
+        token[16..28].copy_from_slice(&acc);
+        token
+    }
+
+    /// Query the DCE/RPC `auth_value` length for a padded stub of `padded_stub_len` bytes.
+    pub fn dce_auth_value_len(&self, conf_req: bool, padded_stub_len: usize) -> Result<usize> {
+        if conf_req && !padded_stub_len.is_multiple_of(16) {
+            return Err(crate::error::Error::Iov(format!(
+                "DCE/RPC sealed stub must be a multiple of 16 bytes (got {padded_stub_len})"
+            )));
+        }
+        Ok(if conf_req { 60 } else { 28 })
+    }
+
+    /// Protect a DCE/RPC PDU using the 4-buffer `GSS_C_DCE_STYLE` IOV layout.
+    pub fn wrap_dce_iov(
+        &mut self,
+        header: &[u8],
+        stub: &mut [u8],
+        sec_trailer: &[u8],
+        conf_req: bool,
+    ) -> Result<Vec<u8>> {
+        if self.state != MockContextState::Established {
+            return Err(crate::error::Error::NotEstablished);
+        }
+        self.dce_auth_value_len(conf_req, stub.len())?;
+        let token = Self::compute_dce_auth_token(header, stub, sec_trailer, conf_req);
+        if conf_req && !self.config.wrap_passthrough {
+            for b in stub.iter_mut() {
+                *b ^= 0x42;
+            }
+        }
+        Ok(token)
+    }
+
+    /// Verify and (when `expect_conf = true`) decrypt in-place a DCE/RPC PDU.
+    pub fn unwrap_dce_iov(
+        &mut self,
+        header: &[u8],
+        stub: &mut [u8],
+        sec_trailer: &[u8],
+        auth_value: &[u8],
+        expect_conf: bool,
+    ) -> Result<()> {
+        if self.state != MockContextState::Established {
+            return Err(crate::error::Error::NotEstablished);
+        }
+        self.dce_auth_value_len(expect_conf, stub.len())?;
+        if expect_conf && !self.config.wrap_passthrough {
+            for b in stub.iter_mut() {
+                *b ^= 0x42;
+            }
+        }
+        let expected = Self::compute_dce_auth_token(header, stub, sec_trailer, expect_conf);
+        if auth_value != expected.as_slice() {
+            return Err(crate::error::Error::Iov(
+                "Kerberos DCE/RPC MIC verification failed".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Builder for configuring mock contexts
 #[cfg(any(test, feature = "mock"))]
 pub struct MockContextBuilder {
@@ -626,5 +717,49 @@ mod tests {
         ctx.initial_token().unwrap();
         ctx.accept_response(&[0x00]).unwrap();
         assert!(ctx.is_established());
+    }
+
+    #[test]
+    fn test_mock_context_dce_iov_seal_and_sign() {
+        let mut ctx = MockContextBuilder::new()
+            .with_successful_handshake()
+            .with_encryption_simulation()
+            .build();
+        let _ap_req = ctx.initial_token().unwrap();
+        let _third_leg = ctx.accept_response(&[0x00]).unwrap();
+
+        let header = [0x05u8; 24];
+        let sec_trailer = [0x10, 0x06, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00];
+        let plaintext = *b"0123456789abcdef0123456789abcdef";
+        let mut stub = plaintext;
+
+        let auth_value = ctx
+            .wrap_dce_iov(&header, &mut stub, &sec_trailer, true)
+            .unwrap();
+        assert_eq!(auth_value.len(), 60);
+        assert_ne!(stub, plaintext);
+
+        // Tampering with the SIGN_ONLY header or sec_trailer must fail unwrap_dce_iov
+        let mut bad_header = header;
+        bad_header[12] ^= 0xFF;
+        let mut stub_copy = stub;
+        assert!(ctx
+            .unwrap_dce_iov(&bad_header, &mut stub_copy, &sec_trailer, &auth_value, true)
+            .is_err());
+
+        // Valid unwrap_dce_iov decrypts in place and verifies SIGN_ONLY buffers
+        ctx.unwrap_dce_iov(&header, &mut stub, &sec_trailer, &auth_value, true)
+            .unwrap();
+        assert_eq!(stub, plaintext);
+
+        // Integrity-only (conf_req = false) leaves stub cleartext and produces 28-byte token
+        let mut signed_stub = *b"0123456789ab";
+        let mic_token = ctx
+            .wrap_dce_iov(&header, &mut signed_stub, &sec_trailer, false)
+            .unwrap();
+        assert_eq!(mic_token.len(), 28);
+        assert_eq!(&signed_stub, b"0123456789ab");
+        ctx.unwrap_dce_iov(&header, &mut signed_stub, &sec_trailer, &mic_token, false)
+            .unwrap();
     }
 }

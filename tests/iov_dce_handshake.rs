@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod iov_tests {
-    use kerbsec::{AuthLevel, Context, KerberosConfig};
+    use fabi_kerbsec::{AuthLevel, Context, KerberosConfig};
 
     #[test]
     #[ignore] // Requires Kerberos environment
@@ -75,7 +75,7 @@ mod iov_tests {
 
 #[cfg(test)]
 mod dce_handshake_tests {
-    use kerbsec::{Context, Error, KerberosConfig};
+    use fabi_kerbsec::{Context, Error, KerberosConfig};
 
     #[test]
     #[ignore] // Requires Kerberos environment
@@ -179,7 +179,7 @@ mod dce_handshake_tests {
 
 #[cfg(test)]
 mod error_mapping_tests {
-    use kerbsec::Error;
+    use fabi_kerbsec::Error;
 
     #[test]
     fn test_gss_error_preserves_codes() {

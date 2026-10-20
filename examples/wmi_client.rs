@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example wmi_client --features dns,runtime,trace
 
-use kerbsec::{AuthLevel, Context, KerberosConfig};
+use fabi_kerbsec::{AuthLevel, Context, KerberosConfig};
 
 #[cfg(not(feature = "trace"))]
 use std::io::Write;
