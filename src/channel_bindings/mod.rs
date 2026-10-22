@@ -30,16 +30,18 @@ pub enum ChannelBindingType {
 
 impl ChannelBindingType {
     /// Get the GSS-API channel binding type identifier
-    #[must_use] pub const fn gss_type(&self) -> u32 {
+    #[must_use]
+    pub const fn gss_type(&self) -> u32 {
         match self {
-            Self::TlsUnique => 0, // GSS_C_CB_TLS_UNIQUE
+            Self::TlsUnique => 0,         // GSS_C_CB_TLS_UNIQUE
             Self::TlsServerEndPoint => 1, // GSS_C_CB_TLS_SERVER_END_POINT
-            Self::TlsExporter => 2, // GSS_C_CB_TLS_EXPORTER
+            Self::TlsExporter => 2,       // GSS_C_CB_TLS_EXPORTER
         }
     }
 
     /// Get the string representation for the binding type
-    #[must_use] pub const fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::TlsUnique => "tls-unique",
             Self::TlsServerEndPoint => "tls-server-end-point",
@@ -49,8 +51,7 @@ impl ChannelBindingType {
 }
 
 /// Enhanced channel bindings with TLS support
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ChannelBindings {
     /// Type of channel binding
     pub binding_type: Option<ChannelBindingType>,
@@ -68,10 +69,8 @@ pub struct ChannelBindings {
 
 impl ChannelBindings {
     /// Create new channel bindings with TLS data
-    #[must_use] pub fn new_tls(
-        binding_type: ChannelBindingType,
-        binding_data: Vec<u8>,
-    ) -> Self {
+    #[must_use]
+    pub fn new_tls(binding_type: ChannelBindingType, binding_data: Vec<u8>) -> Self {
         Self {
             binding_type: Some(binding_type),
             initiator_addr: None,
@@ -81,7 +80,8 @@ impl ChannelBindings {
     }
 
     /// Create channel bindings with addresses
-    #[must_use] pub const fn new_with_addresses(
+    #[must_use]
+    pub const fn new_with_addresses(
         initiator: Option<SocketAddr>,
         acceptor: Option<SocketAddr>,
     ) -> Self {
@@ -94,7 +94,8 @@ impl ChannelBindings {
     }
 
     /// Create TLS channel bindings with addresses
-    #[must_use] pub fn new_full(
+    #[must_use]
+    pub fn new_full(
         binding_type: ChannelBindingType,
         binding_data: Vec<u8>,
         initiator: Option<SocketAddr>,
@@ -110,7 +111,9 @@ impl ChannelBindings {
 
     /// Convert to GSS-API channel bindings structure
     /// Returns (`initiator_addr`, `acceptor_addr`, `application_data`)
-    #[must_use] pub fn to_gss_bindings(&self) -> (Option<Vec<u8>>, Option<Vec<u8>>, Option<Vec<u8>>) {
+    #[must_use]
+    #[allow(clippy::type_complexity)]
+    pub fn to_gss_bindings(&self) -> (Option<Vec<u8>>, Option<Vec<u8>>, Option<Vec<u8>>) {
         let initiator = self.initiator_addr.map(|addr| {
             // Format: address type (2 bytes) + address data
             let mut data = Vec::new();
@@ -146,12 +149,14 @@ impl ChannelBindings {
             data
         });
 
-        let app_data = self.application_data.as_ref().map(|buf| buf.as_bytes().to_vec());
+        let app_data = self
+            .application_data
+            .as_ref()
+            .map(|buf| buf.as_bytes().to_vec());
 
         (initiator, acceptor, app_data)
     }
 }
-
 
 /// Trait for extracting channel binding data from TLS connections
 pub trait TlsChannelBindingExtractor {
@@ -172,7 +177,10 @@ mod tests {
     #[test]
     fn test_channel_binding_types() {
         assert_eq!(ChannelBindingType::TlsUnique.as_str(), "tls-unique");
-        assert_eq!(ChannelBindingType::TlsServerEndPoint.as_str(), "tls-server-end-point");
+        assert_eq!(
+            ChannelBindingType::TlsServerEndPoint.as_str(),
+            "tls-server-end-point"
+        );
         assert_eq!(ChannelBindingType::TlsExporter.as_str(), "tls-exporter");
 
         assert_eq!(ChannelBindingType::TlsUnique.gss_type(), 0);
@@ -183,10 +191,7 @@ mod tests {
     #[test]
     fn test_channel_bindings_creation() {
         let binding_data = vec![0x01, 0x02, 0x03, 0x04];
-        let bindings = ChannelBindings::new_tls(
-            ChannelBindingType::TlsExporter,
-            binding_data.clone(),
-        );
+        let bindings = ChannelBindings::new_tls(ChannelBindingType::TlsExporter, binding_data);
 
         assert_eq!(bindings.binding_type, Some(ChannelBindingType::TlsExporter));
         assert!(bindings.application_data.is_some());

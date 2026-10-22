@@ -13,19 +13,22 @@ pub struct SecureBuffer {
 
 impl SecureBuffer {
     /// Create a new secure buffer with the given data
-    #[must_use] pub const fn new(data: Vec<u8>) -> Self {
+    #[must_use]
+    pub const fn new(data: Vec<u8>) -> Self {
         Self { data }
     }
 
     /// Create an empty secure buffer with the given capacity
-    #[must_use] pub fn with_capacity(capacity: usize) -> Self {
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
             data: Vec::with_capacity(capacity),
         }
     }
 
     /// Get a reference to the data
-    #[must_use] pub fn as_bytes(&self) -> &[u8] {
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
         &self.data
     }
 
@@ -35,12 +38,14 @@ impl SecureBuffer {
     }
 
     /// Get the length of the buffer
-    #[must_use] pub const fn len(&self) -> usize {
+    #[must_use]
+    pub const fn len(&self) -> usize {
         self.data.len()
     }
 
     /// Check if the buffer is empty
-    #[must_use] pub const fn is_empty(&self) -> bool {
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
@@ -56,7 +61,8 @@ impl SecureBuffer {
     }
 
     /// Convert to a Vec, consuming self
-    #[must_use] pub fn into_vec(mut self) -> Vec<u8> {
+    #[must_use]
+    pub fn into_vec(mut self) -> Vec<u8> {
         let mut result = Vec::new();
         std::mem::swap(&mut result, &mut self.data);
         result
@@ -98,27 +104,32 @@ pub struct SessionKey {
 
 impl SessionKey {
     /// Create a new session key
-    #[must_use] pub const fn new(key: Vec<u8>, algorithm: String) -> Self {
+    #[must_use]
+    pub const fn new(key: Vec<u8>, algorithm: String) -> Self {
         Self { key, algorithm }
     }
 
     /// Get the key bytes
-    #[must_use] pub fn as_bytes(&self) -> &[u8] {
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
         &self.key
     }
 
     /// Get the algorithm name
-    #[must_use] pub fn algorithm(&self) -> &str {
+    #[must_use]
+    pub fn algorithm(&self) -> &str {
         &self.algorithm
     }
 
     /// Get the key length in bytes
-    #[must_use] pub const fn len(&self) -> usize {
+    #[must_use]
+    pub const fn len(&self) -> usize {
         self.key.len()
     }
 
     /// Check if the key is empty
-    #[must_use] pub const fn is_empty(&self) -> bool {
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.key.is_empty()
     }
 }
@@ -131,27 +142,32 @@ pub struct GssToken {
 
 impl GssToken {
     /// Create a new GSS token
-    #[must_use] pub const fn new(data: Vec<u8>) -> Self {
+    #[must_use]
+    pub const fn new(data: Vec<u8>) -> Self {
         Self { data }
     }
 
     /// Get the token data
-    #[must_use] pub fn as_bytes(&self) -> &[u8] {
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
         &self.data
     }
 
     /// Get the token length
-    #[must_use] pub const fn len(&self) -> usize {
+    #[must_use]
+    pub const fn len(&self) -> usize {
         self.data.len()
     }
 
     /// Check if the token is empty
-    #[must_use] pub const fn is_empty(&self) -> bool {
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
     /// Convert to Vec, consuming self
-    #[must_use] pub fn into_vec(mut self) -> Vec<u8> {
+    #[must_use]
+    pub fn into_vec(mut self) -> Vec<u8> {
         let mut result = Vec::new();
         std::mem::swap(&mut result, &mut self.data);
         result
@@ -168,33 +184,43 @@ pub struct SecureWrappedMessage {
 
 impl SecureWrappedMessage {
     /// Create a new wrapped message
-    #[must_use] pub const fn new(header: Vec<u8>, data: Vec<u8>, trailer: Vec<u8>) -> Self {
-        Self { header, data, trailer }
+    #[must_use]
+    pub const fn new(header: Vec<u8>, data: Vec<u8>, trailer: Vec<u8>) -> Self {
+        Self {
+            header,
+            data,
+            trailer,
+        }
     }
 
     /// Get the header
-    #[must_use] pub fn header(&self) -> &[u8] {
+    #[must_use]
+    pub fn header(&self) -> &[u8] {
         &self.header
     }
 
     /// Get the data
-    #[must_use] pub fn data(&self) -> &[u8] {
+    #[must_use]
+    pub fn data(&self) -> &[u8] {
         &self.data
     }
 
     /// Get the trailer
-    #[must_use] pub fn trailer(&self) -> &[u8] {
+    #[must_use]
+    pub fn trailer(&self) -> &[u8] {
         &self.trailer
     }
 
     /// Get the total size
-    #[must_use] pub const fn total_size(&self) -> usize {
+    #[must_use]
+    pub const fn total_size(&self) -> usize {
         self.header.len() + self.data.len() + self.trailer.len()
     }
 }
 
 /// Utility function to securely compare two byte slices in constant time
-#[must_use] pub fn secure_compare(a: &[u8], b: &[u8]) -> bool {
+#[must_use]
+pub fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     use subtle::ConstantTimeEq;
 
     if a.len() != b.len() {
@@ -258,11 +284,7 @@ mod tests {
 
     #[test]
     fn test_secure_wrapped_message() {
-        let msg = SecureWrappedMessage::new(
-            vec![1, 2],
-            vec![3, 4, 5],
-            vec![6, 7]
-        );
+        let msg = SecureWrappedMessage::new(vec![1, 2], vec![3, 4, 5], vec![6, 7]);
 
         assert_eq!(msg.header(), &[1, 2]);
         assert_eq!(msg.data(), &[3, 4, 5]);

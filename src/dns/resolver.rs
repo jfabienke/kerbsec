@@ -11,10 +11,17 @@ use tracing::{debug, instrument};
 
 /// Canonicalize hostname to FQDN via DNS (CNAME → A/AAAA)
 ///
+/// The resolver follows any CNAME chain itself (including search-domain
+/// expansion for short names); the canonical name is the owner name of the first
+/// address record in the answer, lowercased and without the trailing dot. A name
+/// that resolves but has no address records, or any lookup failure, is an error
+/// rather than a silent fallback to the input.
+///
 /// # Errors
 ///
 /// Returns an error if:
 /// - DNS resolution fails
+/// - The answer contains no address records
 /// - Timeout occurs
 #[cfg_attr(feature = "trace", instrument(
     target = "kerbsec::dns",
@@ -33,57 +40,31 @@ pub async fn canonicalize_fqdn(host: &str, dns_timeout: Duration) -> Result<Stri
     #[cfg(feature = "trace")]
     debug!(target: "kerbsec::dns", "canonicalizing hostname");
 
-    // Perform DNS resolution with timeout
-    const MAX_CNAME_DEPTH: u8 = 10;
-
     let result = timeout(dns_timeout, async {
         // Create resolver using system configuration (/etc/resolv.conf)
         let resolver = Resolver::builder_tokio()
             .map_err(|e| Error::Dns(anyhow::anyhow!("Failed to create resolver builder: {e}")))?
             .build();
 
-        // Chase CNAME chain to find canonical name
-        let mut current_name = host.to_string();
-        let mut cname_depth = 0;
+        let response = resolver
+            .lookup_ip(host)
+            .await
+            .map_err(|e| Error::CanonicalizationFailed(format!("{host}: {e}")))?;
 
-        while cname_depth < MAX_CNAME_DEPTH {
-            if let Ok(cname_response) = resolver.lookup(&current_name, RecordType::CNAME).await {
-                if let Some(cname_record) = cname_response.iter().next() {
-                    if let Some(cname) = cname_record.as_cname() {
-                        current_name = cname.to_ascii().to_lowercase();
-                        #[cfg(feature = "trace")]
-                        debug!(target: "kerbsec::dns", depth = cname_depth, name = %current_name, "following CNAME chain");
-                        cname_depth += 1;
-                        continue;
-                    }
-                }
-            }
-            break;
-        }
+        let canonical = canonical_owner_name(
+            response
+                .as_lookup()
+                .record_iter()
+                .map(|r| (r.record_type(), r.name().to_ascii())),
+        )
+        .ok_or_else(|| {
+            Error::CanonicalizationFailed(format!("{host}: no address records in answer"))
+        })?;
 
-        // Now resolve the final name to ensure it exists
-        match resolver.lookup_ip(&current_name).await {
-            Ok(_) => {
-                // Successfully resolved - use the canonical name from CNAME chain
-                // Remove trailing dot if present and lowercase
-                let canonical = current_name.trim_end_matches('.').to_lowercase();
+        #[cfg(feature = "trace")]
+        debug!(target: "kerbsec::dns", canonical = %canonical, "canonicalization complete");
 
-                #[cfg(feature = "trace")]
-                debug!(target: "kerbsec::dns", canonical = %canonical, "canonicalization complete");
-
-                Ok(canonical)
-            }
-            Err(e) => {
-                // If CNAME chain led nowhere, try original host
-                if current_name != host && resolver.lookup_ip(host).await.is_ok() {
-                        let canonical = host.trim_end_matches('.').to_lowercase();
-                        #[cfg(feature = "trace")]
-                        debug!(target: "kerbsec::dns", canonical = %canonical, "using original hostname (lowercased)");
-                        return Ok(canonical);
-                }
-                Err(Error::CanonicalizationFailed(format!("{host}: {e}")))
-            }
-        }
+        Ok(canonical)
     })
     .await;
 
@@ -94,6 +75,34 @@ pub async fn canonicalize_fqdn(host: &str, dns_timeout: Duration) -> Result<Stri
             "DNS timeout for {host}"
         ))),
     }
+}
+
+/// Lowercase a DNS name and drop the trailing root dot
+fn normalize_name(name: &str) -> String {
+    name.trim_end_matches('.').to_lowercase()
+}
+
+/// The canonical name from an answer: the owner of the first A/AAAA record
+///
+/// After the resolver has followed a CNAME chain, the address records are owned by
+/// the chain's final target, so this is the canonical name. CNAME records
+/// themselves are owned by the alias and must not be used.
+fn canonical_owner_name(records: impl Iterator<Item = (RecordType, String)>) -> Option<String> {
+    records
+        .filter(|(ty, _)| matches!(ty, RecordType::A | RecordType::AAAA))
+        .map(|(_, name)| normalize_name(&name))
+        .find(|name| !name.is_empty())
+}
+
+/// `host:port` strings from SRV data, ordered per RFC 2782
+///
+/// Lowest priority first; within a priority, higher weight first (a deterministic
+/// stand-in for weighted random selection).
+fn order_srv_targets(mut srv: Vec<(u16, u16, String, u16)>) -> Vec<String> {
+    srv.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
+    srv.into_iter()
+        .map(|(_, _, host, port)| format!("{}:{port}", normalize_name(&host)))
+        .collect()
 }
 
 /// Discover KDC via DNS SRV records
@@ -123,10 +132,19 @@ pub async fn discover_kdc(realm: &str, dns_timeout: Duration) -> Result<Vec<Stri
 
         match resolver.srv_lookup(&srv_name).await {
             Ok(response) => {
-                let kdcs: Vec<String> = response
-                    .iter()
-                    .map(|srv| format!("{}:{}", srv.target().to_lowercase(), srv.port()))
-                    .collect();
+                let kdcs = order_srv_targets(
+                    response
+                        .iter()
+                        .map(|srv| {
+                            (
+                                srv.priority(),
+                                srv.weight(),
+                                srv.target().to_ascii(),
+                                srv.port(),
+                            )
+                        })
+                        .collect(),
+                );
 
                 if kdcs.is_empty() {
                     Err(Error::Dns(anyhow::anyhow!(
@@ -149,5 +167,47 @@ pub async fn discover_kdc(realm: &str, dns_timeout: Duration) -> Result<Vec<Stri
         Err(_) => Err(Error::Dns(anyhow::anyhow!(
             "DNS timeout discovering KDC for {realm}"
         ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_name_is_first_address_owner_not_cname_owner() {
+        let answer = vec![
+            (RecordType::CNAME, "Alias.Example.COM.".to_string()),
+            (RecordType::A, "Host.Corp.Example.Com.".to_string()),
+            (RecordType::AAAA, "other.example.com.".to_string()),
+        ];
+        assert_eq!(
+            canonical_owner_name(answer.into_iter()).as_deref(),
+            Some("host.corp.example.com")
+        );
+    }
+
+    #[test]
+    fn no_address_records_means_no_canonical_name() {
+        let answer = vec![(RecordType::CNAME, "alias.example.com.".to_string())];
+        assert_eq!(canonical_owner_name(answer.into_iter()), None);
+        assert_eq!(canonical_owner_name(std::iter::empty()), None);
+    }
+
+    #[test]
+    fn srv_targets_are_ordered_and_have_no_trailing_dot() {
+        let srv = vec![
+            (20, 100, "kdc3.example.com.".to_string(), 88),
+            (10, 10, "KDC2.example.com.".to_string(), 88),
+            (10, 50, "kdc1.example.com.".to_string(), 8888),
+        ];
+        assert_eq!(
+            order_srv_targets(srv),
+            [
+                "kdc1.example.com:8888",
+                "kdc2.example.com:88",
+                "kdc3.example.com:88"
+            ]
+        );
     }
 }

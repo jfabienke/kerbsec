@@ -40,7 +40,6 @@ When using the builder pattern, the following defaults are applied:
 | `require_mutual_auth` | `true`               | Require server authentication              |
 | `default_auth`        | `AuthLevel::Privacy` | Use encryption by default                  |
 | `dns_timeout`         | 5 seconds            | DNS resolution timeout                     |
-| `gss_timeout`         | 30 seconds           | GSS operation timeout                      |
 
 ## GSS Flags Configuration
 
@@ -57,8 +56,8 @@ let config = KerberosConfig::builder()
 ```
 
 **Effects of DCE-style:**
-- Disables GSS sequence number checking (DCE has its own)
-- Allows out-of-order message processing
+- Selects the DCE/RPC three-leg handshake and relaxed IOV padding/trailer rules
+- Does not disable sequence/replay detection
 - Modifies replay detection to work with DCE/RPC
 
 **When to use:**
@@ -277,7 +276,6 @@ kerbsec = {
         "iov",               # Zero-copy IOV operations (default)
         "ccache",            # Credential cache support
         "trace",             # Structured logging
-        # "allow-weak-crypto"  # DANGEROUS: Enable RC4
     ]
 }
 ```
@@ -315,7 +313,7 @@ kerbsec respects standard Kerberos environment variables:
 |----------------------|---------------------------|----------------------------|
 | `KRB5CCNAME`         | Credential cache location | `FILE:/tmp/krb5cc_1000`    |
 | `KRB5_CONFIG`        | Kerberos config file      | `/etc/krb5.conf`           |
-| `KRB5_KTNAME`        | Keytab file location      | `/etc/krb5.keytab`         |
+| `KRB5_KTNAME`        | Acceptor (server) keytab; not used by kerbsec | `/etc/krb5.keytab` |
 | `KRB5_CLIENT_KTNAME` | Client keytab             | `/home/user/client.keytab` |
 | `KRB5RCACHETYPE`     | Replay cache type         | `none` (for testing)       |
 | `KRB5_TRACE`         | Trace file for debugging  | `/tmp/krb5_trace.log`      |
@@ -374,7 +372,6 @@ let config = KerberosConfig::builder()
     .dce_style(false)       // Use standard GSS-API
     .delegation(false)      // Never delegate
     .mutual_auth(true)      // Always verify
-    .gss_timeout(Duration::from_secs(10))  // Short timeout
     .channel_bindings(Some(cb))  // Bind to TLS
     .build()?;
 ```
@@ -389,7 +386,6 @@ let config = KerberosConfig::builder()
     .target_host("fast-server.example.com")
     .default_auth(AuthLevel::Integrity)  // Skip encryption
     .dns_timeout(Duration::from_secs(2))  // Fast DNS timeout
-    .gss_timeout(Duration::from_secs(60))  // Longer GSS timeout
     .build()?;
 ```
 

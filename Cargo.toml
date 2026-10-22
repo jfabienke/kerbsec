@@ -1,6 +1,6 @@
 [package]
 name = "kerbsec"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "Internal Kerberos (GSS-API) library for DCE/RPC on Unix"
@@ -12,7 +12,7 @@ publish = false
 
 [features]
 default = ["dns", "runtime", "iov"]
-dns = ["dep:hickory-resolver"]
+dns = ["dep:hickory-resolver", "dep:tokio", "dep:anyhow"]
 runtime = ["dep:tokio"]
 iov = []  # Enable GSS IOV operations for zero-copy wrapping
 ccache = ["dep:tempfile"]  # Core credential cache support
@@ -22,11 +22,10 @@ channel-bindings = []  # TLS channel bindings (RFC 5929)
 channel-bindings-rustls = ["channel-bindings", "dep:rustls", "dep:ring"]
 windows-sspi = []  # Reserved for future use
 trace = ["dep:tracing", "dep:tracing-subscriber"]
-allow-weak-crypto = []  # Enable RC4 and other weak ciphers (NOT RECOMMENDED)
 
 [dependencies]
 thiserror = "2"
-anyhow = "1.0"
+anyhow = { version = "1.0", optional = true }
 bytes = "1.0"
 tracing = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"], optional = true }
@@ -44,17 +43,16 @@ ring = { version = "0.17", optional = true }
 
 # Unix-only GSS-API - exact version for security
 [target.'cfg(unix)'.dependencies]
-libgssapi = { version = "=0.9.1", default-features = false }
+# libgssapi 0.9.1 plus one accessor (ClientCtx::raw_ctx); see vendor/libgssapi/README.md.
+# A path dependency (not [patch]) so crates that depend on kerbsec get the patched copy too.
+libgssapi = { path = "vendor/libgssapi", version = "=0.9.1", default-features = false }
 libc = "0.2"
 
 [dev-dependencies]
-proptest = "1.4"
-rstest = "0.18"
-pretty_assertions = "1.4"
-tokio-test = "0.4"
+# Header-derived constants/layouts that tests/ffi_abi.rs compares our hand-written FFI against
+libgssapi-sys = "0.3.1"
 tokio = { version = "1.47", features = ["rt-multi-thread", "macros"] }
 anyhow = "1.0"
-criterion = { version = "0.5", features = ["html_reports"] }
 
 [[example]]
 name = "wmi_client"
@@ -64,19 +62,38 @@ required-features = ["dns", "runtime"]
 name = "ccache_demo"
 required-features = ["ccache"]
 
-[[bench]]
-name = "wrap_unwrap"
-harness = false
-
 [lints.rust]
 warnings = "warn"
 missing_docs = "warn"
 
-[build-dependencies]
-pkg-config = "0.3"
-
 [lints.clippy]
-all = "warn"
-pedantic = "warn"
-nursery = "warn"
-cargo = "warn"
+# Lint groups with explicit priority (higher = evaluated later)
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+# Allow specific lints that are acceptable in this codebase
+# Multiple crate versions - caused by transitive dependencies we can't control
+multiple_crate_versions = "allow"
+# Missing errors doc for internal/parse functions - would be overly verbose
+missing_errors_doc = "allow"
+# Missing panics doc - we don't document intentional panics for internal functions
+missing_panics_doc = "allow"
+# Cast truncation is intentional in protocol code where sizes are bounded
+cast_possible_truncation = "allow"
+# Sign loss is intentional in timestamp handling
+cast_sign_loss = "allow"
+# Cast wrap is intentional in FFI code where we control the bounds
+cast_possible_wrap = "allow"
+# Allow map_or with function calls - often cleaner than alternatives
+option_if_let_else = "allow"
+# Allow significant drop temporaries - often unavoidable with RAII types
+significant_drop_tightening = "allow"
+# Allow borrow_as_ptr in FFI code - &mut x as ptr is idiomatic for FFI
+borrow_as_ptr = "allow"
+# Allow unused self in trait implementations
+unused_self = "allow"
+# Kerberos names its messages AP-REQ/AP-REP; `ap_req` and `ap_rep` are the clearest
+# binding names even though they differ by one letter
+similar_names = "allow"

@@ -79,8 +79,10 @@ kerbsec is a lightweight Kerberos security context library designed specifically
   - `mod.rs`: Common types (IovWrap, Oid)
 
 #### 4. FFI Layer (`src/ffi/`)
-- **Purpose**: Custom FFI bindings for IOV operations
-- **Why Custom**: libgssapi 0.9.1 doesn't expose IOV
+- **Purpose**: Hand-written bindings for `gss_wrap`/`gss_unwrap`, the IOV calls and
+  `gss_wrap_size_limit`
+- **Why Custom**: libgssapi's wrappers discard `conf_state`, which kerbsec checks to
+  reject Privacy downgrades; `tests/ffi_abi.rs` checks the bindings against the headers
 - **Safety**: All unsafe code isolated here
 
 ### Optional Components
@@ -289,8 +291,7 @@ kerbsec
 ├── runtime ──► tokio
 ├── iov ──────► (enables IOV code paths)
 ├── trace ────► tracing, tracing-subscriber
-├── ccache ───► credential cache management
-└── allow-weak-crypto ► RC4 support (DANGEROUS)
+└── ccache ───► credential cache management
 
  Runtime Configuration (v0.2.0+):
  ├── DCE-style flag (configurable)

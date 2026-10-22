@@ -18,9 +18,8 @@
 //! - Advisory locking prevents concurrent corruption
 //! - No credentials are ever logged
 
-
-pub mod format;
 mod file;
+pub mod format;
 mod memory;
 
 #[cfg(feature = "ccache-kcm")]
@@ -31,8 +30,8 @@ mod keyring;
 
 // Re-export core types
 pub use format::{
-    Credential, KeyBlock, Principal, Times, NameType, EncType,
-    Address, AuthData, FILE_FORMAT_VERSION,
+    Address, AuthData, Credential, EncType, KeyBlock, NameType, Principal, Times,
+    FILE_FORMAT_VERSION,
 };
 
 use crate::error::Result;
@@ -115,11 +114,9 @@ pub fn create_cache(config: CacheConfig) -> Result<Box<dyn CredentialCache>> {
         #[cfg(all(target_os = "linux", feature = "ccache-keyring"))]
         CacheBackend::Keyring => Ok(Box::new(keyring::KeyringCache::new(config))),
         #[cfg(all(target_os = "linux", not(feature = "ccache-keyring")))]
-        CacheBackend::Keyring => {
-            Err(Error::Ccache {
-                text: "Keyring backend not compiled in (enable ccache-keyring feature)".to_string(),
-            })
-        }
+        CacheBackend::Keyring => Err(crate::error::Error::Ccache {
+            text: "Keyring backend not compiled in (enable ccache-keyring feature)".to_string(),
+        }),
         #[cfg(feature = "ccache-kcm")]
         CacheBackend::Kcm => Ok(Box::new(kcm::KcmCache::new(config))),
         #[cfg(target_os = "windows")]

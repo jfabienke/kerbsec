@@ -2,12 +2,12 @@
 //!
 //! This example demonstrates the DCE/RPC 3-leg Kerberos handshake:
 //! 1. Client sends AP-REQ in bind PDU
-//! 2. Server responds with AP-REP in bind_ack
-//! 3. Client sends third leg (even if empty) in alter_context
+//! 2. Server responds with AP-REP in `bind_ack`
+//! 3. Client sends third leg (even if empty) in `alter_context`
 //!
-//! Run with: cargo run --example wmi_client --features dns,runtime,trace
+//! Run with: cargo run --example `wmi_client` --features dns,runtime,trace
 
-use kerbsec::{AuthLevel, Context, KerberosConfig};
+use kerbsec::{AuthLevel, Context};
 
 #[cfg(not(feature = "trace"))]
 use std::io::Write;

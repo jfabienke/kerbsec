@@ -4,7 +4,5 @@
 //! operation, including:
 //! - CNAME following for canonical hostname resolution
 //! - SRV record lookups for KDC discovery
-//! - SPN construction and validation
 
 pub mod resolver;
-pub mod spn;

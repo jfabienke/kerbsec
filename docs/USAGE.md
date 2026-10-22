@@ -28,9 +28,8 @@ let config = KerberosConfig::builder()
 ```
 
 **When enabled (default):**
-- Disables GSS sequence number checking (DCE/RPC has its own)
-- Allows out-of-order message processing
-- Prevents GSS replay cache from interfering with DCE/RPC
+- Selects the DCE/RPC three-leg handshake and relaxed IOV padding/trailer rules
+- Does not disable sequence/replay detection
 
 **When to disable:**
 - Non-DCE/RPC Kerberos applications
@@ -339,7 +338,8 @@ kerbsec respects standard Kerberos environment variables:
 |-----------------|---------------------------|-----------------------|
 | `KRB5CCNAME`    | Credential cache location | `/tmp/krb5cc_1000`    |
 | `KRB5_CONFIG`   | Config file path          | `/etc/krb5.conf`      |
-| `KRB5_KTNAME`   | Keytab file location      | `/etc/krb5.keytab`    |
+| `KRB5_CLIENT_KTNAME` | Client keytab (service accounts) | `/etc/krb5.keytab` |
+| `KRB5_KTNAME`   | Acceptor (server) keytab; not used by kerbsec | `/etc/krb5.keytab` |
 | `KRB5RCACHEDIR` | Replay cache directory    | `/var/tmp`            |
 | `KRB5_TRACE`    | Debug trace file          | `/tmp/krb5_trace.log` |
 | `GSS_USE_IOV`   | Force IOV usage           | `1`                   |
@@ -362,21 +362,15 @@ export KRB5_TRACE_LEVEL=5
 
 ## Security Considerations
 
-### RC4 Disabled by Default
+### Encryption types come from krb5.conf
 
-RC4-HMAC (arcfour-hmac) is disabled by default due to known weaknesses:
-
-```rust
-// Enable weak ciphers only if absolutely necessary (NOT RECOMMENDED)
-#[cfg(feature = "allow-weak-crypto")]
-let config = KerberosConfig::builder()
-    .realm("LEGACY.CORP")
-    .target_host("old.server")
-    .allow_weak_crypto(true) // Enables RC4
-    .build()?;
-```
+kerbsec does not select encryption types; the KDC and system GSS-API library negotiate
+them. RC4-HMAC (arcfour-hmac) is weak, so keep `allow_weak_crypto = false` (see the
+`krb5.conf` examples above) and restrict `permitted_enctypes`.
 
 ### Supported Encryption Types
+
+Strength guide only; the negotiated type is governed by `krb5.conf`.
 
 | Type                       | Security | Default | Notes            |
 |----------------------------|----------|---------|------------------|

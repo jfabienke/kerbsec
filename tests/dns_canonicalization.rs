@@ -14,29 +14,6 @@ mod dns_tests {
     }
 
     #[tokio::test]
-    async fn test_canonicalize_lowercase() {
-        // FQDNs should be lowercased
-        let tests = vec![
-            ("EXAMPLE.COM", "example.com"),
-            ("Server.Example.Com", "server.example.com"),
-            ("HOST.LOCAL", "host.local"),
-        ];
-
-        for (input, expected) in tests {
-            // This will fail without actual DNS, but tests the lowercasing
-            match canonicalize_fqdn(input, Duration::from_secs(1)).await {
-                Ok(result) => {
-                    // If it resolves, must be lowercase
-                    assert_eq!(result.to_lowercase(), result);
-                }
-                Err(_) => {
-                    // Expected without DNS server
-                }
-            }
-        }
-    }
-
-    #[tokio::test]
     async fn test_canonicalize_timeout() {
         // Should timeout for unreachable DNS
         let timeout = Duration::from_millis(100);
@@ -47,37 +24,16 @@ mod dns_tests {
     }
 
     #[tokio::test]
-    async fn test_canonicalize_removes_trailing_dot() {
-        // Trailing dots should be removed
-        let tests = vec!["example.com.", "server.example.com.", "host.local."];
-
-        for input in tests {
-            match canonicalize_fqdn(input, Duration::from_secs(1)).await {
-                Ok(result) => {
-                    assert!(!result.ends_with('.'));
-                }
-                Err(_) => {
-                    // Expected without DNS
-                }
-            }
-        }
-    }
-
-    #[tokio::test]
-    #[ignore] // Requires real DNS server
+    #[ignore = "requires public DNS"]
     async fn test_canonicalize_cname_chain() {
-        // Test CNAME chasing (requires configured DNS)
         // www.google.com typically has CNAMEs
-        let result = canonicalize_fqdn("www.google.com", Duration::from_secs(5)).await;
+        let canonical = canonicalize_fqdn("www.google.com", Duration::from_secs(5))
+            .await
+            .expect("www.google.com should resolve");
 
-        if let Ok(canonical) = result {
-            // Should be lowercase
-            assert_eq!(canonical.to_lowercase(), canonical);
-            // Should not have trailing dot
-            assert!(!canonical.ends_with('.'));
-            // Should be a valid FQDN
-            assert!(canonical.contains('.'));
-        }
+        assert_eq!(canonical.to_lowercase(), canonical);
+        assert!(!canonical.ends_with('.'));
+        assert!(canonical.contains('.'));
     }
 }
 

@@ -49,8 +49,8 @@ fn wrap_iov_fallback(...) {
 ### GSS_C_DCE_STYLE Flag (0x1000) ✅
 
 Critical for DCE/RPC:
-- Disables GSS sequence checking (DCE has its own)
-- Allows out-of-order message processing
+- Selects the DCE/RPC three-leg handshake and relaxed IOV padding/trailer rules
+- Does not disable sequence/replay detection
 - Prevents replay cache interference
 
 ```rust

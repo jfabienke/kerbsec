@@ -11,12 +11,16 @@
 //! - Automatic cleanup on process/session termination
 //! - Per-user isolation enforced by the kernel
 
+// Allow unused code - keyring constants and methods are defined for API
+// completeness and future use, even if not all are used currently.
+#![allow(dead_code)]
+
+use super::format::{FileFormatParser, FileFormatSerializer};
 use super::{CacheConfig, Credential, CredentialCache, Principal};
-use super::format::{FileFormatSerializer, FileFormatParser};
 use crate::error::{Error, Result};
 use std::ffi::CString;
 use std::io::Cursor;
-use std::os::raw::{c_char, c_int, c_long, c_ulong};
+use std::os::raw::{c_char, c_int, c_long};
 use std::path::Path;
 use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -70,6 +74,7 @@ pub struct KeyringCache {
 
 impl KeyringCache {
     /// Create a new keyring cache backend
+    #[allow(clippy::missing_const_for_fn)] // Can't be const: Vec::new() is not const
     pub fn new(config: CacheConfig) -> Self {
         Self {
             config,
@@ -109,7 +114,10 @@ impl KeyringCache {
 
         if key_id < 0 {
             return Err(Error::Ccache {
-                text: format!("Failed to add key to keyring: {}", std::io::Error::last_os_error()),
+                text: format!(
+                    "Failed to add key to keyring: {}",
+                    std::io::Error::last_os_error()
+                ),
             });
         }
 
@@ -143,7 +151,10 @@ impl KeyringCache {
 
         if key_id < 0 {
             return Err(Error::Ccache {
-                text: format!("Key not found in keyring: {}", description.to_string_lossy()),
+                text: format!(
+                    "Key not found in keyring: {}",
+                    description.to_string_lossy()
+                ),
             });
         }
 
@@ -157,7 +168,10 @@ impl KeyringCache {
 
         if size < 0 {
             return Err(Error::Ccache {
-                text: format!("Failed to get key size: {}", std::io::Error::last_os_error()),
+                text: format!(
+                    "Failed to get key size: {}",
+                    std::io::Error::last_os_error()
+                ),
             });
         }
 
@@ -175,7 +189,10 @@ impl KeyringCache {
 
         if read_size < 0 {
             return Err(Error::Ccache {
-                text: format!("Failed to read key data: {}", std::io::Error::last_os_error()),
+                text: format!(
+                    "Failed to read key data: {}",
+                    std::io::Error::last_os_error()
+                ),
             });
         }
 
@@ -226,12 +243,7 @@ impl KeyringCache {
         }
 
         // Create new keyring
-        let keyring_id = self.add_key(
-            "keyring",
-            name,
-            &[],
-            KEY_SPEC_USER_SESSION_KEYRING,
-        )?;
+        let keyring_id = self.add_key("keyring", name, &[], KEY_SPEC_USER_SESSION_KEYRING)?;
 
         self.keyring_id = Some(keyring_id);
         Ok(keyring_id)
@@ -276,7 +288,7 @@ impl KeyringCache {
         let version = parser.parse_version()?;
         if version != super::format::FILE_FORMAT_VERSION {
             return Err(Error::Ccache {
-                text: format!("Unsupported format version: 0x{:04x}", version),
+                text: format!("Unsupported format version: 0x{version:04x}"),
             });
         }
 
@@ -292,7 +304,7 @@ impl KeyringCache {
             match parser.parse_credential() {
                 Ok(cred) => self.credentials.push(cred),
                 Err(e) => {
-                    let error_str = format!("{}", e);
+                    let error_str = format!("{e}");
                     if error_str.contains("fill whole buffer") || error_str.contains("EOF") {
                         break;
                     }
@@ -326,8 +338,8 @@ impl CredentialCache for KeyringCache {
             .to_string();
 
         // Strip KEYRING: prefix if present
-        let cache_name = if cache_name.starts_with("KEYRING:") {
-            cache_name[8..].to_string()
+        let cache_name = if let Some(stripped) = cache_name.strip_prefix("KEYRING:") {
+            stripped.to_string()
         } else {
             cache_name
         };
@@ -335,7 +347,7 @@ impl CredentialCache for KeyringCache {
         self.cache_name = Some(cache_name.clone());
 
         // Get or create keyring
-        let keyring_id = self.get_or_create_keyring(&format!("krb5cc_{}", cache_name))?;
+        let keyring_id = self.get_or_create_keyring(&format!("krb5cc_{cache_name}"))?;
 
         // Try to load existing credentials
         if let Ok(key_id) = self.request_key("user", &cache_name, keyring_id) {
@@ -379,7 +391,8 @@ impl CredentialCache for KeyringCache {
 
         // Remove existing ticket for same server
         let server_str = credential.server.to_string();
-        self.credentials.retain(|c| c.server.to_string() != server_str);
+        self.credentials
+            .retain(|c| c.server.to_string() != server_str);
 
         // Add new ticket
         self.credentials.push(credential);
@@ -389,7 +402,8 @@ impl CredentialCache for KeyringCache {
     }
 
     fn get_ticket(&mut self, spn: &str) -> Result<Option<Credential>> {
-        Ok(self.credentials
+        Ok(self
+            .credentials
             .iter()
             .find(|c| c.server.to_string() == spn && !Self::is_expired(c))
             .cloned())
@@ -407,7 +421,8 @@ impl CredentialCache for KeyringCache {
     }
 
     fn list(&self) -> Result<Vec<String>> {
-        Ok(self.credentials
+        Ok(self
+            .credentials
             .iter()
             .map(|c| c.server.to_string())
             .collect())
@@ -431,7 +446,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore] // Requires Linux kernel with keyring support
+    #[ignore = "requires Linux kernel keyring support"]
     fn test_keyring_basic() {
         let config = CacheConfig::default();
         let mut cache = KeyringCache::new(config);
@@ -441,7 +456,7 @@ mod tests {
 
         // This might fail on non-Linux or without proper permissions
         if result.is_err() {
-            println!("Expected error (not on Linux or no keyring support): {:?}", result);
+            println!("Expected error (not on Linux or no keyring support): {result:?}");
             return;
         }
 

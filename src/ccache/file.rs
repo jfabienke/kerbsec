@@ -6,8 +6,8 @@
 //! - Proper permission settings (0600 by default)
 //! - Full read/write support for credential caching
 
-use super::{CacheConfig, Credential, CredentialCache, Principal};
 use super::format::{FileFormatParser, FileFormatSerializer, FILE_FORMAT_VERSION};
+use super::{CacheConfig, Credential, CredentialCache, Principal};
 use crate::error::{Error, Result};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufReader, BufWriter};
@@ -123,10 +123,9 @@ impl FileCache {
         let dir = path.parent().unwrap_or_else(|| Path::new("/tmp"));
 
         // Create temporary file in same directory for atomic rename
-        let temp_file = NamedTempFile::new_in(dir)
-            .map_err(|e| Error::Ccache {
-                text: format!("Failed to create temp file: {e}"),
-            })?;
+        let temp_file = NamedTempFile::new_in(dir).map_err(|e| Error::Ccache {
+            text: format!("Failed to create temp file: {e}"),
+        })?;
 
         // Set permissions before writing
         #[cfg(unix)]
@@ -275,8 +274,9 @@ impl CredentialCache for FileCache {
         self.path = Some(path.to_path_buf());
 
         // Try to read existing cache
-        if path.exists() && path.metadata().map(|m| m.len() > 0).unwrap_or(false) {
-            if matches!(self.read_from_file(path), Ok(())) {} else {
+        if path.exists() && path.metadata().is_ok_and(|m| m.len() > 0) {
+            if matches!(self.read_from_file(path), Ok(())) {
+            } else {
                 // File exists but couldn't be read - might be corrupted or just created
                 // Don't log errors as they may be expected (e.g., new empty file)
                 // Clear any partial data but keep the path so load() can retry
@@ -292,7 +292,7 @@ impl CredentialCache for FileCache {
         // If we don't have credentials, try to load from file
         if self.credentials.is_empty() {
             if let Some(path) = self.path.clone() {
-                if path.exists() && path.metadata().map(|m| m.len() > 0).unwrap_or(false) {
+                if path.exists() && path.metadata().is_ok_and(|m| m.len() > 0) {
                     // Try to read the file - if it fails, return empty
                     let _ = self.read_from_file(&path);
                 }
@@ -318,7 +318,8 @@ impl CredentialCache for FileCache {
 
         // Remove existing ticket for same server if present
         let server_str = credential.server.to_string();
-        self.credentials.retain(|c| c.server.to_string() != server_str);
+        self.credentials
+            .retain(|c| c.server.to_string() != server_str);
 
         // Add new ticket
         self.credentials.push(credential);
@@ -343,7 +344,8 @@ impl CredentialCache for FileCache {
         }
 
         // Find matching non-expired ticket
-        Ok(self.credentials
+        Ok(self
+            .credentials
             .iter()
             .find(|c| c.server.to_string() == spn && !Self::is_expired(c))
             .cloned())
@@ -364,7 +366,8 @@ impl CredentialCache for FileCache {
     }
 
     fn list(&self) -> Result<Vec<String>> {
-        Ok(self.credentials
+        Ok(self
+            .credentials
             .iter()
             .map(|c| c.server.to_string())
             .collect())
@@ -389,7 +392,7 @@ impl CredentialCache for FileCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ccache::format::{NameType, Times, KeyBlock};
+    use crate::ccache::format::{KeyBlock, NameType, Times};
     use std::fs;
     use tempfile::tempdir;
 
@@ -417,11 +420,11 @@ mod tests {
             times: Times {
                 auth_time: now,
                 start_time: now,
-                end_time: now + 36000, // 10 hours
+                end_time: now + 36000,   // 10 hours
                 renew_till: now + 86400, // 24 hours
             },
             is_config: 0,
-            ticket_flags: 0x40a10000,
+            ticket_flags: 0x40a1_0000,
             addresses: Vec::new(),
             ticket: vec![0xde, 0xad, 0xbe, 0xef], // Dummy ticket
             second_ticket: Vec::new(),
@@ -453,7 +456,9 @@ mod tests {
         }
 
         // Get the ticket back
-        let retrieved = cache.get_ticket("host/server.test.realm@TEST.REALM").unwrap();
+        let retrieved = cache
+            .get_ticket("host/server.test.realm@TEST.REALM")
+            .unwrap();
         assert!(retrieved.is_some());
 
         let retrieved = retrieved.unwrap();
@@ -465,8 +470,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let cache_path = dir.path().join("atomic.cache");
 
-        let mut config = CacheConfig::default();
-        config.atomic_writes = true;
+        let config = CacheConfig {
+            atomic_writes: true,
+            ..CacheConfig::default()
+        };
 
         let mut cache = FileCache::new(config);
         cache.open(&cache_path).unwrap();
@@ -549,7 +556,9 @@ mod tests {
         assert_eq!(cache.list().unwrap().len(), 2);
 
         // Remove one
-        cache.remove_ticket("host/server.test.realm@TEST.REALM").unwrap();
+        cache
+            .remove_ticket("host/server.test.realm@TEST.REALM")
+            .unwrap();
 
         // Verify only one remains
         let list = cache.list().unwrap();

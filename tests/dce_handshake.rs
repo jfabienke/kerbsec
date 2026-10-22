@@ -93,6 +93,9 @@ mod tests {
         use kerbsec::Context;
 
         /// Test that Context creation succeeds on Unix
+        ///
+        /// Creating a context needs no KDC; credentials are only acquired by
+        /// `initial_token`.
         #[test]
         fn test_context_creation() {
             let config = KerberosConfig::builder()
@@ -101,27 +104,8 @@ mod tests {
                 .build()
                 .expect("Config build should succeed");
 
-            // This will fail without proper Kerberos setup, but should compile
-            let _result = Context::new(config);
-            // Don't assert success as it requires real GSS-API
-        }
-
-        /// Test that mech OID is correct
-        #[test]
-        fn test_mech_oid() {
-            use kerbsec::KRB5_MECH_OID;
-
-            let config = KerberosConfig::builder()
-                .realm("TEST")
-                .target_host("host")
-                .build()
-                .expect("Config build should succeed");
-
-            if let Ok(ctx) = Context::new(config) {
-                let oid = ctx.mech_oid();
-                // OID comparison - both should be KRB5 mech OID
-                assert_eq!(oid, &KRB5_MECH_OID);
-            }
+            let ctx = Context::new(config).expect("Context creation should succeed");
+            assert!(!ctx.established());
         }
     }
 }

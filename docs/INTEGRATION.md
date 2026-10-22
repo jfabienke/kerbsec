@@ -499,8 +499,7 @@ let token = ctx.initial_token().unwrap(); // Panics!
 // DO: Use strongest available protection
 .default_auth(AuthLevel::Privacy)
 
-// DON'T: Use weak ciphers
-.allow_weak_crypto(true) // Enables RC4!
+// DON'T: Weaken the Kerberos library (krb5.conf allow_weak_crypto = true)
 ```
 
 ---

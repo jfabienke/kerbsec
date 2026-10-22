@@ -5,7 +5,24 @@ All notable changes to kerbsec will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - Unreleased
+
+### Security
+- Unwrap on a Privacy context rejects tokens that were not encrypted
+  (`Error::ConfidentialityNotProvided`); previously a signed-only token was accepted.
+- Wrap reports confidentiality from the mechanism's `conf_state` and fails if Privacy
+  was requested but not applied; previously it echoed the request.
+- Negotiated flags are verified after the handshake (integrity always; mutual auth,
+  confidentiality and DCE style when configured) - `Error::FlagNotNegotiated`. A failed
+  flag inquiry is an error instead of assuming the requested flags.
+- No longer reads libgssapi's private `ClientCtx` layout; libgssapi 0.9.1 is vendored
+  with one accessor, `ClientCtx::raw_ctx()`.
+- A credential cache or keytab that conflicts with the process-wide one is an error
+  instead of being silently ignored. `KRB5_KTNAME` is no longer used as a client keytab.
+- Credential delegation disabled by default for security
+- DCE-style enabled by default for DCE/RPC compatibility
+- Mutual authentication required by default
+- Comprehensive security warnings added for delegation usage
 
 ### Added
 - **Runtime-Configurable GSS Flags** - Security and compatibility flags are now runtime-configurable:
@@ -21,16 +38,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `.delegation(bool)` - Enable/disable credential delegation
   - `.mutual_auth(bool)` - Control mutual authentication requirement
 
+### Fixed
+- Target principal: `HOST/fqdn` was imported as a host-based service name, so the KDC
+  was asked for the wrong principal. It is now imported as `spn@realm`.
+- Handshake ordering is enforced (`Error::HandshakeState`); an AP-REP that leaves the
+  context incomplete is an error instead of being reported as established.
+- DNS canonicalization returns the name owning the address records and reports lookup
+  errors; KDC discovery strips the trailing dot and orders by SRV priority/weight.
+- `wrap_size_limit` uses `gss_wrap_size_limit` once established.
+- IOV padding is rejected instead of being dropped; plaintext is wiped on failure.
+- Address-only channel bindings, or bindings set after the first leg, are errors.
+- `Context` is now actually `!Sync`, as documented.
+- GSS error text includes every status message, not only the first.
+- `--no-default-features` and `--features ccache` build again.
+- GSS error text kept only the supplementary condition on Heimdal and Apple's
+  GSS.framework (e.g. "duplicate token" but not "invalid MIC"); the error and
+  supplementary bits are now displayed separately.
+
 ### Changed
 - GSS_C_DCE_STYLE flag moved from compile-time feature to runtime configuration
 - Configuration defaults documented and standardized across the codebase
 - Security documentation expanded with delegation risks and mitigation strategies
+- **Breaking:** `Context::set_channel_bindings` returns `Result<()>`.
+- **Breaking:** The configured realm is appended to SPN overrides that do not name one.
+- **Breaking:** Config `build()`/`build_async()` reject an empty realm or host and normalize hosts.
+- **Breaking:** `Context` is no longer `Sync` (it was documented as `!Sync` but was `Sync`).
+- **Breaking:** New `Error` variants: `ConfidentialityNotProvided`, `HandshakeState`,
+  `FlagNotNegotiated`.
 
-### Security
-- Credential delegation disabled by default for security
-- DCE-style enabled by default for DCE/RPC compatibility
-- Mutual authentication required by default
-- Comprehensive security warnings added for delegation usage
+### Removed (breaking)
+- `EncryptionType` and the `allow-weak-crypto` feature (they never affected
+  negotiation; encryption types come from `krb5.conf`).
+- Error variants that were never produced: `ClockSkew`, `SpnNotFound`,
+  `EncryptionTypeMismatch`, `DelegationDenied`, `PreAuthFailed`, `TicketExpired`,
+  `KdcUnreachable`.
+- `security::traits` mocks and the `mock` / `integration-tests` features; `dns::spn`;
+  the unused `gss_timeout` setting; `build.rs`; the mock benchmark.
+
+### Testing
+- `scripts/e2e-kdc.sh` and `tests/e2e_kdc.rs`: real 3-leg handshake against a
+  throwaway MIT KDC, run in CI.
+- `tests/ffi_abi.rs` checks the hand-written FFI against the system headers.
+- CI `macos` job: clippy, tests and the e2e handshake against Apple's GSS.framework.
+- Known issue: Heimdal on Linux with the `iov` feature fails Privacy and Integrity
+  wraps (DCE-style IOV layout); use it without `iov`.
+- Removed tests that could not fail.
 
 ## [0.2.0] - 2025-01-21
 
@@ -175,7 +227,7 @@ Security vulnerabilities should be reported via:
 - [Issue Tracker](https://github.com/internal/kerbsec/issues)
 - [Security Policy](docs/SECURITY.md)
 
-[Unreleased]: https://github.com/internal/kerbsec/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/internal/kerbsec/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/internal/kerbsec/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/internal/kerbsec/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/internal/kerbsec/releases/tag/v0.0.1

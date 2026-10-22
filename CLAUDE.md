@@ -31,32 +31,30 @@ cargo test --all-features
 # Run with trace logging enabled
 RUST_LOG=kerbsec=debug cargo test --features trace
 
-# Test specific module
-cargo test --test integration
+# Test specific file
+cargo test --all-features --test config_flags
 
 # Test with MIT Kerberos tracing
 KRB5_TRACE=/tmp/krb5.log cargo test
 ```
 
+### End-to-end (real KDC)
+```bash
+# Starts a throwaway MIT KDC on localhost, runs the real 3-leg handshake (tests/e2e_kdc.rs)
+# Needs: krb5-kdc krb5-admin-server krb5-user
+./scripts/e2e-kdc.sh
+```
+
 ### Linting & Verification
 ```bash
-# Run clippy lints (configured with pedantic, nursery, cargo lints)
-cargo clippy --all-features -- -D warnings
+# Run clippy lints (configured with pedantic, nursery, cargo lints) - same as CI
+cargo clippy --all-targets --all-features -- -D warnings
 
 # Check formatting
 cargo fmt --check
 
 # Generate docs
 cargo doc --all-features --no-deps
-```
-
-### Benchmarking
-```bash
-# Run performance benchmarks
-cargo bench
-
-# Generate benchmark report
-cargo bench -- --save-baseline main
 ```
 
 ### Running Examples
@@ -87,17 +85,20 @@ The library implements a layered architecture with platform abstractions:
    - `AuthLevel`: Integrity vs Privacy selection
 
 4. **FFI Layer** (`src/ffi/`)
-   - Custom FFI bindings for IOV operations (gss_wrap_iov/gss_unwrap_iov)
-   - Required because libgssapi 0.9.1 doesn't expose IOV functions
-   - Platform-specific: Linux has native IOV, macOS falls back to regular wrap/unwrap
+   - Hand-written bindings for `gss_wrap`/`gss_unwrap`, `gss_wrap_iov`/`gss_unwrap_iov`,
+     `gss_wrap_size_limit` and status display
+   - Needed because libgssapi's wrappers discard `conf_state`, which kerbsec must check
+   - `tests/ffi_abi.rs` checks them against the system headers
+   - Platform-specific: Linux (with `iov`) uses native IOV; elsewhere single-token
+     `gss_wrap`/`gss_unwrap`
 
 ### Protocol Implementation
 
 The library implements DCE/RPC-specific Kerberos semantics:
 
 1. **DCE-Style Flag**: Manually applies GSS_C_DCE_STYLE (0x1000) via bitwise operations
-   - Disables GSS sequence number checking (DCE has its own)
-   - Allows out-of-order message processing
+   - Selects the DCE/RPC three-leg handshake and relaxed IOV padding/trailer rules
+   - Does NOT disable sequence/replay detection (those flags are still requested)
 
 2. **IOV Operations**: Zero-copy message protection on Linux
    - Header (16-32 bytes) + Data (unchanged for integrity) + Trailer (12-16 bytes)
@@ -115,7 +116,6 @@ The library implements DCE/RPC-specific Kerberos semantics:
 - `iov`: GSS IOV operations for zero-copy (default)
 - `ccache`: Credential cache support
 - `trace`: Structured logging via tracing
-- `allow-weak-crypto`: Enable RC4 (NOT RECOMMENDED)
 
 ## Platform Differences
 
@@ -123,18 +123,24 @@ The library implements DCE/RPC-specific Kerberos semantics:
 - Full native IOV support via custom FFI bindings
 - Optimal zero-copy performance
 - Direct access to gss_wrap_iov/gss_unwrap_iov
+- **Heimdal on Linux with `iov` does not work**: in DCE style Heimdal rejects the
+  HEADER|DATA|PADDING|TRAILER layout and integrity-only `gss_wrap_iov` (`EINVAL`).
+  Build without `iov` on Heimdal; the single-token path passes the e2e tests there.
 
-### macOS (Heimdal)
-- No IOV support in GSS.framework
-- Falls back to regular wrap/unwrap with header/trailer estimation
-- Performance still good but not optimal
+### macOS (Apple GSS.framework, Heimdal-derived)
+- kerbsec does not use IOV here; it uses single-token `gss_wrap`/`gss_unwrap`
+- `IovWrap::header` holds the whole token; `payload` and `trailer` are empty
+- Same confidentiality and flag checks as Linux
+- CI's `macos` job runs clippy, the tests and `scripts/e2e-kdc.sh` (KDC and kinit
+  from Homebrew `krb5`) against GSS.framework
 
 ## Critical Implementation Details
 
 1. **GSS_C_DCE_STYLE Flag**: Critical for DCE/RPC - manually applied since libgssapi doesn't expose it
-2. **Thread Safety**: Context is Send but NOT Sync - cannot be shared between threads
-3. **Memory Management**: Zero-copy on Linux IOV, one allocation on macOS fallback
-4. **Error Handling**: Structured errors with GSS major/minor codes preserved
+2. **Thread Safety**: Context is Send but NOT Sync (enforced by a `PhantomData<Cell<()>>` marker; libgssapi's own context claims Sync) - cannot be shared between threads
+3. **Confidentiality is verified, not assumed**: wrap/unwrap read the real `conf_state`; Privacy that was not applied/present is `Error::ConfidentialityNotProvided`. Negotiated flags are checked after the handshake.
+4. **Memory Management**: Zero-copy on Linux IOV, one allocation on macOS fallback
+5. **Error Handling**: Structured errors with GSS major/minor codes preserved
 
 ## Dependencies
 
@@ -144,7 +150,9 @@ The library implements DCE/RPC-specific Kerberos semantics:
 - **RHEL/Fedora**: `krb5-devel`
 
 ### Key Rust Dependencies
-- `libgssapi = "=0.9.1"`: Exact version pinned for security
+- `libgssapi = "=0.9.1"`: Exact version pinned for security. Vendored in `vendor/libgssapi`
+  (as a path dependency, so dependents get it too) with a single addition, `ClientCtx::raw_ctx()`, so our FFI can
+  observe `conf_state` without reading private struct layout. Re-apply it when upgrading.
 - `hickory-resolver`: DNS operations
 - `tokio`: Async runtime
 - `tracing`: Structured logging

@@ -48,23 +48,15 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
         rust: [stable, beta]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libkrb5-dev
-
-      - name: Install dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install krb5
-          echo "PKG_CONFIG_PATH=/usr/local/opt/krb5/lib/pkgconfig:\$PKG_CONFIG_PATH" >> \$GITHUB_ENV
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -106,3 +98,72 @@ jobs:
         env:
           RUST_LOG: kerbsec::ctx=info,kerbsec::gss=debug,kerbsec::iov=trace
         run: cargo run --example wmi_client --features trace,dns,runtime --no-default-features || true
+
+  # macOS: builds and tests against Apple's GSS.framework (Heimdal-derived), which uses
+  # the single-token gss_wrap/gss_unwrap path, then runs the real handshake against a
+  # throwaway MIT KDC from Homebrew.
+  macos:
+    name: macOS (Apple GSS.framework)
+    runs-on: macos-latest
+    env:
+      # Never pick up Homebrew's MIT libgssapi by accident
+      LIBGSSAPI_IMPL: apple
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Point bindgen at the active SDK
+        # libgssapi-sys hard-codes the Command Line Tools SDK path for <GSS/GSS.h>
+        run: echo "BINDGEN_EXTRA_CLANG_ARGS=-F$(xcrun --show-sdk-path)/System/Library/Frameworks" >> "$GITHUB_ENV"
+
+      - name: Install MIT Kerberos (KDC and kinit for the e2e tests)
+        run: brew list krb5 >/dev/null 2>&1 || brew install krb5
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Run end-to-end tests
+        run: ./scripts/e2e-kdc.sh
+
+  # End-to-end tests: real 3-leg handshake against a throwaway MIT KDC
+  e2e:
+    name: End-to-end (MIT KDC)
+    runs-on: ubuntu-latest
+    needs: [clippy, test]  # Only run after lint and unit tests pass
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Kerberos dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libkrb5-dev krb5-kdc krb5-admin-server krb5-user
+
+      - name: Run end-to-end tests
+        run: ./scripts/e2e-kdc.sh
+
+  # Security audit (advisory, non-blocking)
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Don't fail CI on advisories
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run audit
+        run: cargo audit || echo "::warning::Security advisories found - review recommended"

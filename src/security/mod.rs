@@ -9,10 +9,12 @@
 //! - [`IovWrap`] for IOV buffer management
 //! - [`Oid`] for mechanism identifiers
 //! - Platform-specific GSS context wrappers
+//!
 
+#[cfg(unix)]
 pub mod gss;
 
-#[cfg(all(unix, feature = "iov"))]
+#[cfg(unix)]
 pub mod gss_iov;
 
 pub mod zeroize;
@@ -41,7 +43,8 @@ pub struct Oid {
 
 impl Oid {
     /// Create a new OID with dotted notation and DER encoding
-    #[must_use] pub const fn new(dotted: &'static str, der: &'static [u8]) -> Self {
+    #[must_use]
+    pub const fn new(dotted: &'static str, der: &'static [u8]) -> Self {
         Self { dotted, der }
     }
 

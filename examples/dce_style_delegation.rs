@@ -10,7 +10,7 @@
 //! cargo run --example dce_style_delegation --features dns,runtime
 //! ```
 
-use kerbsec::{KerberosConfig, AuthLevel};
+use kerbsec::{AuthLevel, KerberosConfig};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing if available
@@ -25,10 +25,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Standard DCE/RPC Configuration ===");
     let config = KerberosConfig::builder()
         .realm("CORP.EXAMPLE.COM")
-        .target_host("server.example.com")  // In production, this would be canonicalized
+        .target_host("server.example.com") // In production, this would be canonicalized
         .default_auth(AuthLevel::Privacy)
         // DCE-style is enabled by default
-        .build()?;  // Using synchronous build to avoid DNS resolution for demo
+        .build()?; // Using synchronous build to avoid DNS resolution for demo
 
     println!("DCE-style enabled: {}", config.enable_dce_style);
     println!("Delegation enabled: {}", config.enable_delegation);
@@ -40,11 +40,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .realm("CORP.EXAMPLE.COM")
         .target_host("trusted-server.example.com")
         .default_auth(AuthLevel::Privacy)
-        .delegation(true)  // Enable credential delegation
+        .delegation(true) // Enable credential delegation
         .build()?;
 
-    println!("DCE-style enabled: {}", config_with_delegation.enable_dce_style);
-    println!("Delegation enabled: {}", config_with_delegation.enable_delegation);
+    println!(
+        "DCE-style enabled: {}",
+        config_with_delegation.enable_dce_style
+    );
+    println!(
+        "Delegation enabled: {}",
+        config_with_delegation.enable_delegation
+    );
 
     // Example 3: Non-DCE configuration (rare)
     println!("\n=== Non-DCE Configuration ===");
@@ -52,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .realm("CORP.EXAMPLE.COM")
         .target_host("legacy.example.com")
         .default_auth(AuthLevel::Integrity)
-        .dce_style(false)  // Disable DCE-style (not recommended for DCE/RPC)
+        .dce_style(false) // Disable DCE-style (not recommended for DCE/RPC)
         .build()?;
 
     println!("DCE-style enabled: {}", non_dce_config.enable_dce_style);

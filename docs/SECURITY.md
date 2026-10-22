@@ -144,9 +144,11 @@ struct SessionKey {
 - [x] Tests for downgrade scenarios
 
 ### ✅ Weak Cipher Control
-- [x] RC4 disabled by default
-- [x] Requires explicit `allow-weak-crypto` feature
-- [x] Tests verify RC4 rejection
+- [x] Enctype selection is left to `krb5.conf` / the KDC; kerbsec has no switch for it
+- [x] To forbid RC4/DES set `permitted_enctypes` (and `allow_weak_crypto = false`) in `krb5.conf`
+- [x] Message protection is verified per message: integrity always, confidentiality when
+      `AuthLevel::Privacy` (a token that is not encrypted is rejected with
+      `ConfidentialityNotProvided`)
 
 ## Input Validation
 
@@ -268,22 +270,35 @@ unsafe fn wrap_iov_real(...) {
 
 ### Supported Algorithms
 
+kerbsec does not choose encryption types: the KDC and system GSS-API library negotiate
+them from `krb5.conf`. The table describes algorithm strength, not a kerbsec setting.
+
 | Algorithm           | Status     | Notes                 |
 |---------------------|------------|-----------------------|
 | AES256-CTS-SHA1     | ✅ Default | Recommended           |
 | AES128-CTS-SHA1     | ✅ Enabled | Good performance      |
 | AES-SHA2 (RFC 8009) | ✅ Enabled | Modern standard       |
-| 3DES                | ⚠️ Allowed | Legacy only           |
-| RC4                 | ❌ Disabled | Requires feature flag |
-| DES                 | ❌ Disabled | Never allowed         |
+| 3DES                | ⚠️ Weak    | Legacy only; krb5.conf |
+| RC4                 | ❌ Weak    | Disable in krb5.conf   |
+| DES                 | ❌ Broken  | Disabled by modern MIT |
 
 ### Weak Crypto Prevention
 
+Configure the Kerberos library, not kerbsec:
+
+```ini
+[libdefaults]
+    allow_weak_crypto = false
+    permitted_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96
+```
+
+kerbsec then refuses to run with weaker *message* protection than configured:
+
 ```rust
-// RC4 disabled by default
-#[cfg(not(feature = "allow-weak-crypto"))]
-if uses_rc4(etype) {
-    return Err(Error::WeakCrypto);
+// Privacy contexts reject integrity-only tokens
+match ctx.unwrap_iov(&token) {
+    Err(Error::ConfidentialityNotProvided(_)) => { /* downgrade attempt */ }
+    _ => {}
 }
 ```
 

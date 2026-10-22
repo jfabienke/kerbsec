@@ -4,32 +4,36 @@ Internal Kerberos (GSS-API) library for DCE/RPC on Unix
 
 ## Overview
 
-`kerbsec` provides a lightweight Kerberos security context for DCE/RPC transports by leveraging the system GSS-API (MIT Kerberos or Heimdal). Designed specifically for DCE/RPC authentication and protection, it offers a minimal (~1,500 LOC) implementation that is transport-agnostic.
+`kerbsec` provides a lightweight Kerberos security context for DCE/RPC transports by leveraging the system GSS-API (MIT Kerberos or Heimdal). Designed specifically for DCE/RPC authentication and protection, it offers a focused (~9,000 LOC) implementation that is transport-agnostic.
 
 ## Features
 
 - **MIT Licensed**: Commercial-friendly open source license
 - **Unix-focused**: Leverages system GSS-API (MIT Kerberos/Heimdal)
 - **DCE/RPC optimized**: Implements 3-leg handshake with IOV-like wrap/unwrap
+- **Windows AD compatible**: Full compatibility with Active Directory environments
 - **Runtime-configurable GSS flags**: DCE-style, delegation, and mutual auth
 - **Transport-agnostic**: Users handle RPC framing, kerbsec handles GSS tokens
 - **DNS canonicalization**: Automatic FQDN resolution for proper SPN construction
 - **Flexible auth levels**: Support for Integrity (MIC) and Privacy (seal+MIC)
 - **Credential delegation**: Support for S4U2Self/S4U2Proxy scenarios
+- **Channel bindings**: TLS channel bindings support (RFC 5929)
 - **Zero-copy IOV**: Native IOV operations on Linux for maximum performance
 - **Structured logging**: Feature-gated tracing with module-specific targets
+- **Mock testing**: Built-in mock GSS-API for unit testing without a KDC
 - **Feature-gated**: Optional DNS, async runtime, IOV, ccache, and tracing support
 
 ### Feature Flags
 
-| Feature             | Description                            | Default |
-|---------------------|----------------------------------------|---------|
-| `dns`               | DNS canonicalization and KDC discovery | ✅      |
-| `runtime`           | Async runtime support (tokio)          | ✅      |
-| `iov`               | GSS IOV operations for zero-copy       | ✅      |
-| `ccache`            | Credential cache support               | ❌       |
-| `trace`             | Structured logging via tracing         | ❌       |
-| `allow-weak-crypto` | Enable RC4 (NOT RECOMMENDED)           | ❌       |
+| Feature                   | Description                            | Default |
+|---------------------------|----------------------------------------|---------|
+| `dns`                     | DNS canonicalization and KDC discovery | ✅      |
+| `runtime`                 | Async runtime support (tokio)          | ✅      |
+| `iov`                     | GSS IOV operations for zero-copy       | ✅      |
+| `ccache`                  | Credential cache support               | ❌      |
+| `channel-bindings`        | TLS channel bindings (RFC 5929)        | ❌      |
+| `channel-bindings-rustls` | Channel bindings with rustls           | ❌      |
+| `trace`                   | Structured logging via tracing         | ❌      |
 
 ## Installation
 
@@ -185,17 +189,18 @@ The implementation follows these standards and specifications, available in `doc
 
 ### IOV Implementation
 
-**Linux**: Full native IOV support using custom FFI bindings to `gss_wrap_iov`/`gss_unwrap_iov`. This provides zero-copy operations and optimal performance for DCE/RPC workloads.
+**Linux**: Full native IOV support using custom FFI bindings to `gss_wrap_iov`/`gss_unwrap_iov`. This provides zero-copy operations and optimal performance for DCE/RPC workloads. This is tested with MIT Kerberos. With Heimdal on Linux, build without the `iov` feature: in DCE style Heimdal rejects the IOV buffer layout kerbsec uses.
 
-**macOS**: Falls back to regular wrap/unwrap with header/trailer estimation since GSS.framework doesn't expose IOV functions. Performance is still good but not optimal.
+**macOS** (and Linux without the `iov` feature): uses single-token `gss_wrap`/`gss_unwrap`. `IovWrap::header` holds the whole wrapped token and `payload`/`trailer` are empty, so the caller sends the header as one blob. Confidentiality and flag checks are the same as on Linux.
 
 The implementation automatically detects the platform and uses the best available method
 
 ### GSS_C_DCE_STYLE Flag
 The GSS_C_DCE_STYLE flag (0x1000) is runtime-configurable via the `enable_dce_style` configuration option (defaults to true). Since libgssapi 0.9.1 doesn't expose it in CtxFlags, we manually apply it using bitwise operations. This flag is critical for:
-- Disabling GSS sequence number checking (DCE has its own)
-- Allowing out-of-order message processing
-- Preventing GSS replay cache from interfering with DCE/RPC
+- The DCE/RPC three-leg handshake
+- Relaxed IOV padding/trailer rules for DCE/RPC PDU framing
+
+It does not disable sequence or replay detection; those are still requested.
 
 ```rust
 // Enable DCE-style (default for DCE/RPC compatibility)
@@ -231,8 +236,10 @@ DNS canonicalization now properly:
 
 ## Testing
 
+### Unit Tests
+
 ```bash
-# Run tests with system Kerberos
+# Run all tests
 cargo test --all-features
 
 # Test with tracing enabled
@@ -241,18 +248,22 @@ RUST_LOG=kerbsec=debug cargo test --features trace
 # Test specific log targets
 RUST_LOG=kerbsec::gss=trace,kerbsec::iov=debug cargo test
 
-# Integration test with KDC
-KRB5_CONFIG=/path/to/krb5.conf cargo test --test integration
-
-# Run performance benchmarks
-cargo bench
-
-# Generate benchmark report
-cargo bench -- --save-baseline main
-
 # Platform-specific testing
 cargo test --features iov  # Tests IOV on Linux, fallback on macOS
 ```
+
+### End-to-end tests (throwaway KDC)
+
+`scripts/e2e-kdc.sh` starts a temporary MIT KDC on localhost (needs `krb5-kdc`,
+`krb5-admin-server` and `krb5-user`), performs the real 3-leg handshake against an
+acceptor, and runs `tests/e2e_kdc.rs`:
+
+```bash
+./scripts/e2e-kdc.sh
+```
+
+CI runs the same script in the `e2e` job (Linux, MIT) and the `macos` job (Apple GSS.framework,
+with the KDC and `kinit` from Homebrew's `krb5`).
 
 ## Performance
 
@@ -284,13 +295,13 @@ kerbsec is optimized for DCE/RPC workloads with the following performance target
 | wrap_iov(4KB)   | <100μs     | Typical RPC request     |
 | unwrap_iov(4KB) | <100μs     | Typical RPC response    |
 
-Run benchmarks with `cargo bench` to measure on your hardware.
-
 ## Examples
 
 See the `examples/` directory for complete examples:
 
-- `wmi_client.rs`: Windows WMI query via DCE/RPC with Kerberos (includes logging setup)
+- `wmi_client.rs`: Windows WMI query via DCE/RPC with Kerberos
+- `ccache_demo.rs`: Credential cache operations demo
+- `dce_style_delegation.rs`: DCE-style authentication with delegation
 
 Run with logging:
 ```bash

@@ -79,7 +79,7 @@ impl From<u32> for KcmStatus {
             9 => Self::BadCreds,
             10 => Self::CredentialsMissing,
             11 => Self::BadCache,
-            12 | _ => Self::ServerError,
+            _ => Self::ServerError,
         }
     }
 }
@@ -105,7 +105,10 @@ impl KcmCache {
     /// Connect to the KCM daemon
     fn connect(&self) -> Result<UnixStream> {
         UnixStream::connect(&self.socket_path).map_err(|e| Error::Ccache {
-            text: format!("Failed to connect to KCM daemon at {}: {}", self.socket_path, e),
+            text: format!(
+                "Failed to connect to KCM daemon at {}: {}",
+                self.socket_path, e
+            ),
         })
     }
 
@@ -135,9 +138,11 @@ impl KcmCache {
 
         // Read response
         let mut response = vec![0u8; resp_len];
-        stream.read_exact(&mut response).map_err(|e| Error::Ccache {
-            text: format!("Failed to read KCM response: {e}"),
-        })?;
+        stream
+            .read_exact(&mut response)
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to read KCM response: {e}"),
+            })?;
 
         // Parse status
         if response.len() < 4 {
@@ -225,8 +230,9 @@ impl CredentialCache for KcmCache {
             .to_string();
 
         // Strip KCM: prefix if present
-        let cache_name = cache_name.strip_prefix("KCM:")
-            .map_or(cache_name.clone(), str::to_string);
+        let cache_name = cache_name
+            .strip_prefix("KCM:")
+            .map_or_else(|| cache_name.clone(), str::to_string);
 
         self.cache_name = Some(cache_name);
         Ok(())
@@ -261,10 +267,7 @@ impl CredentialCache for KcmCache {
 
         // Credential data would need to be serialized in KCM format
         // This is a simplified placeholder
-        let cred_data = format!("{} {}",
-            credential.client,
-            credential.server
-        );
+        let cred_data = format!("{} {}", credential.client, credential.server);
         data.extend_from_slice(&(cred_data.len() as u32).to_be_bytes());
         data.extend_from_slice(cred_data.as_bytes());
 
@@ -341,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires running KCM daemon
+    #[ignore = "requires a running KCM daemon"]
     fn test_kcm_connect() {
         let config = CacheConfig::default();
         let cache = KcmCache::new(config);
@@ -349,7 +352,7 @@ mod tests {
         // This will fail unless KCM daemon is running
         match cache.connect() {
             Ok(_) => println!("Successfully connected to KCM daemon"),
-            Err(e) => println!("Expected error (no daemon): {}", e),
+            Err(e) => println!("Expected error (no daemon): {e}"),
         }
     }
 }

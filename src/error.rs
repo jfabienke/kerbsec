@@ -37,9 +37,22 @@ pub enum Error {
     #[error("Handshake not established")]
     NotEstablished,
 
+    /// A handshake step was called out of order
+    #[error("Invalid handshake state: {0}")]
+    HandshakeState(&'static str),
+
+    /// The context was established without a required security property
+    #[error("Required security property not negotiated: {0}")]
+    FlagNotNegotiated(&'static str),
+
     /// Token format error
     #[error("Invalid token shape")]
     TokenShape,
+
+    /// Confidentiality was required but the GSS-API did not apply (wrap) or
+    /// report (unwrap) it, so the message is only integrity protected
+    #[error("Confidentiality required but not provided by GSS-API ({0})")]
+    ConfidentialityNotProvided(&'static str),
 
     /// IOV operations not available
     #[error("IOV operation failed: {0}")]
@@ -73,6 +86,10 @@ pub enum Error {
     /// Feature not yet implemented
     #[error("Not implemented: {0}")]
     NotImplemented(String),
+
+    /// Protocol state errors (e.g., wrong handshake state)
+    #[error("Protocol error: {0}")]
+    Protocol(String),
 }
 
 /// Result type alias for operations that may return an Error

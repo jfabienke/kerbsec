@@ -4,7 +4,7 @@
 //! implementing RFC 5929 (tls-server-end-point) and RFC 9266 (tls-exporter).
 
 #[cfg(feature = "channel-bindings-rustls")]
-use super::{ChannelBindings, ChannelBindingType};
+use super::{ChannelBindingType, ChannelBindings};
 #[cfg(feature = "channel-bindings-rustls")]
 use crate::error::Error;
 
@@ -44,7 +44,7 @@ pub fn extract_rustls_bindings(
             if let Some(version) = conn.protocol_version() {
                 if version == rustls::ProtocolVersion::TLSv1_3 {
                     return Err(Error::ChannelBinding(
-                        "tls-unique not supported in TLS 1.3".into()
+                        "tls-unique not supported in TLS 1.3".into(),
                     ));
                 }
             }
@@ -52,16 +52,18 @@ pub fn extract_rustls_bindings(
             // For TLS 1.2, we would need the Finished message
             // rustls doesn't expose this directly
             Err(Error::ChannelBinding(
-                "tls-unique extraction not implemented for rustls".into()
+                "tls-unique extraction not implemented for rustls".into(),
             ))
         }
 
         ChannelBindingType::TlsServerEndPoint => {
             // Get the peer certificate
-            let cert_chain = conn.peer_certificates()
+            let cert_chain = conn
+                .peer_certificates()
                 .ok_or_else(|| Error::ChannelBinding("No peer certificates".into()))?;
 
-            let server_cert = cert_chain.first()
+            let server_cert = cert_chain
+                .first()
                 .ok_or_else(|| Error::ChannelBinding("Empty certificate chain".into()))?;
 
             // Extract the certificate bytes
@@ -88,9 +90,10 @@ pub fn extract_rustls_bindings(
                 output.as_mut_slice(),
                 EXPORTER_LABEL,
                 Some(EXPORTER_CONTEXT),
-            ).map_err(|e| Error::ChannelBinding(
-                format!("Failed to export keying material: {e:?}")
-            ))?;
+            )
+            .map_err(|e| {
+                Error::ChannelBinding(format!("Failed to export keying material: {e:?}"))
+            })?;
 
             Ok(ChannelBindings::new_tls(
                 ChannelBindingType::TlsExporter,
@@ -102,6 +105,7 @@ pub fn extract_rustls_bindings(
 
 /// Hash a certificate for tls-server-end-point binding
 #[allow(dead_code)]
+#[allow(clippy::unnecessary_wraps)] // Returns Result for future extensibility (signature algorithm parsing)
 fn hash_certificate_for_binding(cert_der: &[u8]) -> Result<Vec<u8>> {
     use ring::digest;
 
@@ -126,17 +130,15 @@ pub fn extract_rustls_server_bindings(
     binding_type: ChannelBindingType,
 ) -> Result<ChannelBindings> {
     match binding_type {
-        ChannelBindingType::TlsUnique => {
-            Err(Error::ChannelBinding(
-                "tls-unique not recommended for servers".into()
-            ))
-        }
+        ChannelBindingType::TlsUnique => Err(Error::ChannelBinding(
+            "tls-unique not recommended for servers".into(),
+        )),
 
         ChannelBindingType::TlsServerEndPoint => {
             // Server uses its own certificate
             // This would need access to the configured certificate
             Err(Error::ChannelBinding(
-                "tls-server-end-point requires server certificate access".into()
+                "tls-server-end-point requires server certificate access".into(),
             ))
         }
 
@@ -150,9 +152,10 @@ pub fn extract_rustls_server_bindings(
                 output.as_mut_slice(),
                 EXPORTER_LABEL,
                 Some(EXPORTER_CONTEXT),
-            ).map_err(|e| Error::ChannelBinding(
-                format!("Failed to export keying material: {e:?}")
-            ))?;
+            )
+            .map_err(|e| {
+                Error::ChannelBinding(format!("Failed to export keying material: {e:?}"))
+            })?;
 
             Ok(ChannelBindings::new_tls(
                 ChannelBindingType::TlsExporter,
@@ -169,7 +172,10 @@ mod tests {
     #[test]
     fn test_binding_type_strings() {
         assert_eq!(ChannelBindingType::TlsUnique.as_str(), "tls-unique");
-        assert_eq!(ChannelBindingType::TlsServerEndPoint.as_str(), "tls-server-end-point");
+        assert_eq!(
+            ChannelBindingType::TlsServerEndPoint.as_str(),
+            "tls-server-end-point"
+        );
         assert_eq!(ChannelBindingType::TlsExporter.as_str(), "tls-exporter");
     }
 

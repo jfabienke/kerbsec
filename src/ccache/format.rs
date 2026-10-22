@@ -110,14 +110,14 @@ pub struct Principal {
 
 impl Principal {
     /// Create a new principal
-    #[must_use] pub const fn new(name_type: NameType, realm: String, components: Vec<String>) -> Self {
+    #[must_use]
+    pub const fn new(name_type: NameType, realm: String, components: Vec<String>) -> Self {
         Self {
             name_type: name_type as u32,
             realm,
             components,
         }
     }
-
 }
 
 impl fmt::Display for Principal {
@@ -227,9 +227,11 @@ impl<R: Read> FileFormatParser<R> {
     /// Parse the file format version
     pub fn parse_version(&mut self) -> Result<u16> {
         let mut buf = [0u8; 2];
-        self.reader.read_exact(&mut buf).map_err(|e| Error::Ccache {
-            text: format!("Failed to read version: {e}"),
-        })?;
+        self.reader
+            .read_exact(&mut buf)
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to read version: {e}"),
+            })?;
         Ok(u16::from_be_bytes(buf))
     }
 
@@ -244,9 +246,11 @@ impl<R: Read> FileFormatParser<R> {
 
         let len = self.read_u16()?;
         let mut data = vec![0u8; len as usize];
-        self.reader.read_exact(&mut data).map_err(|e| Error::Ccache {
-            text: format!("Failed to read header tag data: {e}"),
-        })?;
+        self.reader
+            .read_exact(&mut data)
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to read header tag data: {e}"),
+            })?;
 
         let header_tag = match tag {
             1 => HeaderTag::DeltaTime,
@@ -307,7 +311,10 @@ impl<R: Read> FileFormatParser<R> {
         for _ in 0..count {
             let addr_type = self.read_u16()?;
             let addr_data = self.read_counted_octet_string()?;
-            addresses.push(Address { addr_type, addr_data });
+            addresses.push(Address {
+                addr_type,
+                addr_data,
+            });
         }
         Ok(addresses)
     }
@@ -354,27 +361,33 @@ impl<R: Read> FileFormatParser<R> {
     /// Read a u8
     fn read_u8(&mut self) -> Result<u8> {
         let mut buf = [0u8; 1];
-        self.reader.read_exact(&mut buf).map_err(|e| Error::Ccache {
-            text: format!("Failed to read u8: {e}"),
-        })?;
+        self.reader
+            .read_exact(&mut buf)
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to read u8: {e}"),
+            })?;
         Ok(buf[0])
     }
 
     /// Read a big-endian u16
     fn read_u16(&mut self) -> Result<u16> {
         let mut buf = [0u8; 2];
-        self.reader.read_exact(&mut buf).map_err(|e| Error::Ccache {
-            text: format!("Failed to read u16: {e}"),
-        })?;
+        self.reader
+            .read_exact(&mut buf)
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to read u16: {e}"),
+            })?;
         Ok(u16::from_be_bytes(buf))
     }
 
     /// Read a big-endian u32
     fn read_u32(&mut self) -> Result<u32> {
         let mut buf = [0u8; 4];
-        self.reader.read_exact(&mut buf).map_err(|e| Error::Ccache {
-            text: format!("Failed to read u32: {e}"),
-        })?;
+        self.reader
+            .read_exact(&mut buf)
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to read u32: {e}"),
+            })?;
         Ok(u32::from_be_bytes(buf))
     }
 
@@ -385,9 +398,11 @@ impl<R: Read> FileFormatParser<R> {
             return Ok(String::new());
         }
         let mut buf = vec![0u8; len as usize];
-        self.reader.read_exact(&mut buf).map_err(|e| Error::Ccache {
-            text: format!("Failed to read string data: {e}"),
-        })?;
+        self.reader
+            .read_exact(&mut buf)
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to read string data: {e}"),
+            })?;
         String::from_utf8(buf).map_err(|e| Error::Ccache {
             text: format!("Invalid UTF-8 in string: {e}"),
         })
@@ -400,9 +415,11 @@ impl<R: Read> FileFormatParser<R> {
             return Ok(Vec::new());
         }
         let mut buf = vec![0u8; len as usize];
-        self.reader.read_exact(&mut buf).map_err(|e| Error::Ccache {
-            text: format!("Failed to read octet string: {e}"),
-        })?;
+        self.reader
+            .read_exact(&mut buf)
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to read octet string: {e}"),
+            })?;
         Ok(buf)
     }
 }
@@ -510,24 +527,30 @@ impl<W: Write> FileFormatSerializer<W> {
 
     /// Write a big-endian u16
     fn write_u16(&mut self, value: u16) -> Result<()> {
-        self.writer.write_all(&value.to_be_bytes()).map_err(|e| Error::Ccache {
-            text: format!("Failed to write u16: {e}"),
-        })
+        self.writer
+            .write_all(&value.to_be_bytes())
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to write u16: {e}"),
+            })
     }
 
     /// Write a big-endian u32
     fn write_u32(&mut self, value: u32) -> Result<()> {
-        self.writer.write_all(&value.to_be_bytes()).map_err(|e| Error::Ccache {
-            text: format!("Failed to write u32: {e}"),
-        })
+        self.writer
+            .write_all(&value.to_be_bytes())
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to write u32: {e}"),
+            })
     }
 
     /// Write a counted string (length-prefixed UTF-8)
     fn write_counted_string(&mut self, s: &str) -> Result<()> {
         self.write_u32(s.len() as u32)?;
-        self.writer.write_all(s.as_bytes()).map_err(|e| Error::Ccache {
-            text: format!("Failed to write string data: {e}"),
-        })
+        self.writer
+            .write_all(s.as_bytes())
+            .map_err(|e| Error::Ccache {
+                text: format!("Failed to write string data: {e}"),
+            })
     }
 
     /// Write a counted octet string (length-prefixed bytes)
@@ -567,9 +590,9 @@ mod tests {
     #[test]
     fn test_key_block_zeroization() {
         let key_data = vec![0x42u8; 32]; // Dummy key
-        let mut key_block = KeyBlock {
+        let key_block = KeyBlock {
             enctype: EncType::Aes256CtsHmacSha1_96 as u16,
-            key_data: key_data.clone(),
+            key_data,
         };
 
         // Manually drop and check zeroization
@@ -581,10 +604,10 @@ mod tests {
     #[test]
     fn test_times_serialization() {
         let times = Times {
-            auth_time: 1234567890,
-            start_time: 1234567891,
-            end_time: 1234567892,
-            renew_till: 1234567893,
+            auth_time: 1_234_567_890,
+            start_time: 1_234_567_891,
+            end_time: 1_234_567_892,
+            renew_till: 1_234_567_893,
         };
 
         let mut buf = Vec::new();
@@ -614,7 +637,9 @@ mod tests {
         let mut serializer = FileFormatSerializer::new(&mut buf);
 
         // Write delta time tag
-        serializer.write_header_tag(HeaderTag::DeltaTime, &[0, 0, 0, 60]).unwrap();
+        serializer
+            .write_header_tag(HeaderTag::DeltaTime, &[0, 0, 0, 60])
+            .unwrap();
         serializer.write_header_terminator().unwrap();
 
         let mut parser = FileFormatParser::new(Cursor::new(buf));

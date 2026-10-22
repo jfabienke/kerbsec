@@ -2,20 +2,23 @@
 
 ## Tests Added
 
-### Negative Tests (`tests/negative_tests.rs`)
-- ✅ **SPN IP-override validation**: Ensures IP addresses require SPN override
-- ✅ **Replay attack detection**: Validates sequence number and timestamp checks
-- ✅ **Sequence number tampering**: Tests MIC verification with tampered sequences
-- ✅ **Integrity-only mode**: Verifies non-encrypted MIC-only protection
-- ✅ **Auth level downgrade prevention**: Ensures no downgrade from Privacy to Integrity
-- ✅ **RC4 disabled by default**: Validates weak cipher rejection
-- ✅ **Clock skew tolerance**: Tests 5-minute default tolerance
+### End-to-end Tests (`tests/e2e_kdc.rs`, run by `scripts/e2e-kdc.sh`)
+- ✅ Real 3-leg DCE handshake against a throwaway MIT KDC
+- ✅ Privacy round trip in both directions
+- ✅ **Auth level downgrade prevention**: integrity-only token rejected on a Privacy context
+- ✅ Per-call Privacy on an Integrity context
+- ✅ Negotiated flags (integrity, confidentiality, mutual auth)
+- ✅ `wrap_size_limit` from the mechanism
+- ✅ Handshake ordering errors
 
-### IOV Tests (`tests/iov_wrap.rs`)
-- ✅ IOV structure creation and validation
-- ✅ Integrity vs Privacy mode differences
-- ✅ DCE/RPC PDU structure with IOV
-- ✅ DCE 3-leg handshake sequence validation
+### Negative Tests (`tests/negative_tests.rs`, `tests/iov_dce_handshake.rs`)
+- ✅ **SPN IP-override validation**: Ensures IP addresses require SPN override
+- ✅ Malformed SPN overrides rejected
+- ✅ Wrap/unwrap before the handshake fail with `NotEstablished`
+- ✅ AP-REP before AP-REQ fails with `HandshakeState`
+
+### FFI ABI Tests (`tests/ffi_abi.rs`)
+- ✅ Hand-written FFI constants and struct layouts match the system GSS-API headers
 
 ### Configuration Tests (`tests/dce_handshake.rs`)
 - ✅ Config builder validation
@@ -54,12 +57,6 @@
 
 ## Performance Features
 
-### Benchmarks (`benches/wrap_unwrap.rs`)
-- Wrap/unwrap throughput measurements
-- Integrity vs Privacy mode comparison
-- Multiple payload sizes (256B, 4KB, 64KB)
-- IOV overhead analysis
-
 ### Performance Targets (README)
 | Operation                    | Target    | Notes            |
 |------------------------------|-----------|------------------|
@@ -71,7 +68,6 @@
 ## Security Enhancements
 
 ### Feature Flags
-- `allow-weak-crypto`: RC4 disabled by default, requires explicit opt-in
 - Pinned `libgssapi = "=0.9.1"` for stability
 
 ### Validation
